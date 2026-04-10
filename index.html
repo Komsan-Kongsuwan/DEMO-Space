@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forklift Sorting Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;font-family:Arial,sans-serif;overflow:hidden}
+canvas{display:block}
+#ui{position:absolute;top:80px;left:14px;background:rgba(0,0,0,.82);color:#eee;
+  border-radius:11px;padding:14px 18px;width:222px;font-size:13px;line-height:1.5}
+#ui h2{font-size:14px;font-weight:700;color:#fff;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;margin-bottom:6px}
+.row label{color:#aaa}.row span{color:#fff;font-weight:700}
+input[type=range]{width:100%;accent-color:#f0a500;margin-bottom:8px}
+button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
+#btn-play{background:#f0a500;color:#1a1a2e}
+#btn-reset{background:#333;color:#eee}
+.cams{display:flex;gap:5px;margin-top:9px}
+.cam{flex:1;padding:5px 0;border:1px solid #555;border-radius:5px;font-size:11px;
+  background:transparent;color:#aaa;cursor:pointer}
+.cam.on{background:#f0a500;color:#1a1a2e;border-color:#f0a500;font-weight:700}
+#hud{position:absolute;top:14px;right:14px;background:rgba(0,0,0,.82);color:#eee;
+  border-radius:11px;padding:12px 16px;font-size:12px;line-height:2;text-align:right}
+#hud b{color:#f0a500;font-size:20px;display:block;line-height:1.2}
+#stats{position:absolute;bottom:14px;right:14px;display:flex;gap:9px;flex-wrap:wrap;
+  justify-content:flex-end;max-width:600px}
+.scard{background:rgba(0,0,0,.80);border-radius:10px;padding:10px 14px;font-size:12px;
+  color:#eee;min-width:128px}
+.scard h3{font-size:10px;font-weight:700;color:#f0a500;margin-bottom:6px;
+  text-transform:uppercase;letter-spacing:0.5px}
+.sr{display:flex;justify-content:space-between;gap:10px;margin-bottom:2px}
+.sr label{color:#888;font-size:11px}.sr span{color:#fff;font-weight:700;font-size:11px}
+.st{border-top:1px solid #333;margin-top:5px;padding-top:5px;
+  display:flex;justify-content:space-between}
+.st label{color:#aaa;font-size:11px}.st span{color:#f0a500;font-weight:700;font-size:11px}
+.sec{border-top:1px solid #333;margin-top:10px;padding-top:10px}
+.sec-title{font-size:11px;color:#666;margin-bottom:7px}
+.inp-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.inp-row label{color:#aaa;font-size:11px;flex:1}
+.inp-row input[type=number]{width:60px;background:#222;color:#fff;border:1px solid #444;
+  border-radius:5px;padding:3px 5px;font-size:12px;text-align:right}
+.item-row{display:flex;align-items:center;gap:4px;margin-bottom:5px}
+.item-dot{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+.item-row input[type=text]{flex:1;background:#222;color:#fff;border:1px solid #444;
+  border-radius:5px;padding:3px 5px;font-size:11px;min-width:0}
+.item-row input[type=number]{width:48px;background:#222;color:#fff;border:1px solid #444;
+  border-radius:5px;padding:3px 5px;font-size:11px;text-align:right}
+.item-rm{background:#2a2a2a;border:none;color:#666;border-radius:4px;
+  padding:2px 6px;cursor:pointer;font-size:12px;font-weight:700;flex-shrink:0}
+.item-rm:hover{background:#c0392b;color:#fff}
+#btn-add{width:100%;background:#1a2e1a;color:#6fcf97;border:1px solid #2d5a2d;
+  border-radius:6px;padding:5px 0;font-size:12px;cursor:pointer;margin-top:3px}
+#btn-add:hover{background:#2d5a2d}
+#val-err{color:#e74c3c;font-size:10px;margin-top:4px;min-height:12px}
+#val-tot{font-size:11px;margin-top:4px;text-align:right;color:#888}
+#tooltip{position:absolute;display:none;background:rgba(0,0,0,.85);
+  color:#fff;padding:6px 12px;border-radius:7px;font-size:12px;pointer-events:none;
+  border:1px solid #555;z-index:999;white-space:nowrap;line-height:1.6}
+#tooltip .tt-color{display:inline-block;width:10px;height:10px;border-radius:2px;
+  margin-right:6px;vertical-align:middle}
+</style>
+</head>
+<body>
+<!-- Company branding top-left -->
+<div style="position:absolute;top:14px;left:14px;pointer-events:none">
+  <div style="font-size:22px;font-weight:800;color:#f0a500;letter-spacing:0.5px;line-height:1.2">Demo Logistics</div>
+  <div style="font-size:13px;font-weight:500;color:#aaa;letter-spacing:1px;margin-top:2px">DEMO SPACE</div>
+</div>
+
+<!-- Player card top-right -->
+<div id="tooltip"></div>
+<div id="player" style="position:absolute;top:14px;right:14px;background:rgba(0,0,0,.82);
+  border-radius:11px;padding:8px 12px">
+  <div style="display:flex;align-items:center;gap:7px">
+    <button class="main" id="btn-play" style="width:76px;padding:5px 0;font-size:12px">&#9654; Start</button>
+    <button class="main" id="btn-reset" style="width:62px;padding:5px 0;font-size:12px;background:#333;color:#eee">&#8635; Reset</button>
+    <button class="main" id="btn-fill-temp" style="width:76px;padding:5px 0;font-size:11px;background:#1a3a1a;color:#6fcf97">&#10003; Fill Sort</button>
+    <div style="display:flex;flex-direction:column;gap:1px;min-width:100px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa">
+        <span>Speed</span><span id="sv" style="color:#fff;font-weight:700">4.0x</span>
+      </div>
+      <input type="range" id="speed" min="0.5" max="20" step="0.5" value="4" style="width:100%;accent-color:#f0a500">
+    </div>
+    <div style="display:flex;gap:4px">
+      <button class="cam on" id="c-free" style="padding:4px 8px;font-size:10px">Persp</button>
+      <button class="cam" id="c-follow" style="padding:4px 8px;font-size:10px">Follow</button>
+      <button class="cam" id="c-top" style="padding:4px 8px;font-size:10px">Top</button>
+    </div>
+  </div>
+</div>
+
+<div id="ui">
+  <h2>Settings</h2>
+  <div class="sec" style="margin-top:0;border-top:none;padding-top:0">
+    <div class="sec-title" style="color:#f0c060;font-weight:700">Pallet size</div>
+    <div class="inp-row"><label>Width (cm)</label><input type="number" id="inp-pw" value="120" min="60" max="240" step="10"></div>
+    <div class="inp-row"><label>Length (cm)</label><input type="number" id="inp-pl" value="120" min="60" max="240" step="10"></div>
+    <div class="inp-row"><label>Height (cm)</label><input type="number" id="inp-ph" value="150" min="50" max="280" step="10"></div>
+  </div>
+  <div class="sec">
+    <div class="sec-title" style="color:#f0c060;font-weight:700">Area</div>
+    <div class="inp-row"><label>Columns</label><input type="number" id="inp-cols" value="10" min="2" max="30" step="1"></div>
+    <div class="inp-row"><label>Depth per col</label><input type="number" id="inp-depth" value="10" min="3" max="20" step="1"></div>
+  </div>
+  <div class="sec">
+    <div class="sec-title" style="color:#f0c060;font-weight:700">Items &amp; quantities</div>
+    <div id="item-list" style="max-height:170px;overflow-y:auto;overflow-x:hidden"></div>
+    <button id="btn-add">+ Add item</button>
+    <label id="btn-upload" style="width:100%;background:#1a1a3a;color:#7b9fff;border:1px solid #2d3a7a;
+      border-radius:6px;padding:5px 0;font-size:12px;cursor:pointer;margin-top:4px;
+      display:block;text-align:center;box-sizing:border-box">
+      &#8593; Upload Excel / CSV
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none">
+    </label>
+    <div id="upload-hint" style="font-size:10px;color:#666;margin-top:3px;line-height:1.4">
+      Format: column A = item name, column B = quantity
+    </div>
+    <div id="val-err"></div>
+    <div id="val-tot"></div>
+  </div>
+  <div style="border-top:1px solid #333;margin-top:12px;padding-top:10px;
+    text-align:center;font-size:11px;color:#666;line-height:1.8">
+    Developed by<br>
+    <span style="color:#ccc;font-weight:600">Komsan Kongsuwan</span><br>
+    <span id="dev-email" style="color:#888"></span><br>
+    <span style="color:#888">+66-81-723-9680</span>
+  </div>
+</div>
+
+<!-- Mouse control guide - positioned to right of settings panel via JS -->
+<div id="mouse-guide" style="position:absolute;background:rgba(0,0,0,.72);
+  border-radius:9px;padding:10px 14px;font-size:11px;color:#888;line-height:2;
+  pointer-events:none">
+  <div style="font-size:11px;font-weight:700;color:#aaa;margin-bottom:4px">&#128432; Controls</div>
+  <div><span style="color:#f0a500;font-weight:600">Left drag</span>&nbsp;&nbsp;Rotate view</div>
+  <div><span style="color:#f0a500;font-weight:600">Scroll</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Zoom in / out</div>
+  <div><span style="color:#f0a500;font-weight:600">Mid drag</span>&nbsp;&nbsp;Pan view</div>
+  <div><span style="color:#f0a500;font-weight:600">Shift+Scroll</span>&nbsp;Pan Z axis</div>
+  <div><span style="color:#f0a500;font-weight:600">Alt+Scroll</span>&nbsp;&nbsp;Pan X axis</div>
+</div>
+
+
+<div id="hud" style="display:none">
+  <b id="loaded">0</b><span id="hud-tot"> / 100</span>
+  <div id="status">Ready</div>
+</div>
+
+<div id="info-card" style="position:absolute;right:14px;
+  background:transparent;border-radius:10px;padding:12px 16px;width:320px;
+  font-size:11px;color:#bbb;line-height:1.7;border:1px solid rgba(255,255,255,0.2)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <div style="font-size:12px;font-weight:700;color:#f0a500">&#8505; About This Simulation</div>
+    <div style="display:flex;gap:4px">
+      <button onclick="setLang('en')" id="lang-en" style="background:#f0a500;color:#1a1a2e;border:none;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">EN</button>
+      <button onclick="setLang('th')" id="lang-th" style="background:transparent;color:#aaa;border:1px solid #555;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">TH</button>
+    </div>
+  </div>
+  <div id="info-en">
+    This visualization and simulation is computed from basic operational logic for
+    <b style="color:#eee">guidance purposes only</b>. The sorting sequence, temporary staging,
+    and forklift movements are simplified representations of real warehouse operations.<br><br>
+    Compares two storage approaches:<br>
+    <b style="color:#eee">📦 Receiving Area</b> (left) — <b style="color:#eee">drive-in with clearance gaps</b>,
+    forklift can retrieve any pallet directly but uses more floor space.<br><br>
+    <b style="color:#eee">🗂 Sorting &amp; Storage</b> (right) — <b style="color:#eee">tight block stacking, no gaps</b>,
+    maximizing density. Items grouped by type per column based on quantity, but this approach may use more space if there are many items with few quantity.<br><br>
+    <b style="color:#eee">Picking Sequence:</b> One item type at a time. Blockers are temporarily staged,
+    then target items are retrieved and placed into the sorting area.<br><br>
+    <span style="color:#999"><i>This tool is intended to assist in preliminary space planning and Workflow estimation only. It is necessary to balance between <b style="color:#bbb">space required</b> and <b style="color:#bbb">time required</b>, appropriate to the item types and quantities, before making operational decisions.</i></span>
+  </div>
+  <div id="info-th" style="display:none">
+    การแสดงผลและการจำลองนี้คำนวณจากตรรกะการปฏิบัติงานพื้นฐาน
+    <b style="color:#eee">เพื่อการอ้างอิงเท่านั้น</b> ลำดับการจัดเรียง การจัดเก็บชั่วคราว
+    และการเคลื่อนที่ของรถโฟล์คลิฟท์ เป็นการแสดงแทนที่เรียบง่ายของการปฏิบัติงานคลังสินค้าจริง<br><br>
+    การจำลองนี้เปรียบเทียบวิธีการจัดเก็บสองแบบเคียงกัน:<br><br>
+    <b style="color:#eee">📦 พื้นที่รับสินค้า</b> (ซ้าย) ใช้ <b style="color:#eee">การจัดเก็บแบบขับเข้าพร้อมช่องว่างระหว่างแถว</b>
+    ให้รถโฟล์คลิฟท์สามารถเข้าถึงและหยิบพาเลทได้โดยตรง — แต่ใช้พื้นที่ต่อพาเลทมากกว่า<br><br>
+    <b style="color:#eee">🗂 พื้นที่จัดเรียงและจัดเก็บ</b> (ขวา) ใช้ <b style="color:#eee">การวางซ้อนแบบชิดติดกันไม่มีช่องว่าง</b>
+    เพิ่มความหนาแน่นในการจัดเก็บสูงสุด โดยสินค้าแต่ละประเภทจะถูกจัดกลุ่มไว้ในแถวที่กำหนดตามจำนวน แต่วิธีนี้อาจใช้พื้นที่มากขึ้นหากมีสินค้าหลายประเภทที่มีจำนวนน้อย<br><br>
+    <b style="color:#eee">ลำดับการหยิบสินค้า:</b> รถโฟล์คลิฟท์จัดเรียงสินค้าทีละประเภท
+    พาเลทที่กีดขวางจะถูกนำไปพักชั่วคราวก่อน จากนั้นจึงหยิบสินค้าเป้าหมายและนำไปวางในพื้นที่จัดเรียง<br><br>
+    <span style="color:#999"><i>เครื่องมือนี้มีวัตถุประสงค์เพื่อช่วยในการวางแผนพื้นที่เบื้องต้นและการประมาณการ Workflow เท่านั้น จำเป็นต้องชั่งน้ำหนักระหว่าง <b style="color:#bbb">พื้นที่ที่ต้องใช้</b> และ <b style="color:#bbb">เวลาที่ต้องใช้</b> ให้เหมาะสมกับรายการและจำนวนสินค้าก่อนตัดสินใจดำเนินการจริง</i></span>
+  </div>
+</div>
+
+<div id="stats">
+  <div class="scard">
+    <h3>Receiving</h3>
+    <div class="sr"><label>Width</label><span id="r-w">—</span></div>
+    <div class="sr"><label>Length</label><span id="r-l">—</span></div>
+    <div class="st"><label>Area</label><span id="r-a">—</span></div>
+  </div>
+  <div class="scard">
+    <h3>Sorting</h3>
+    <div class="sr"><label>Width</label><span id="s-w">—</span></div>
+    <div class="sr"><label>Length</label><span id="s-l">—</span></div>
+    <div class="st"><label>Area</label><span id="s-a">—</span></div>
+  </div>
+  <div class="scard">
+    <h3>Drive-in</h3>
+    <div class="sr"><label>Pallet</label><span id="d-pw" style="color:#ff9999">—</span></div>
+    <div class="sr"><label>Clearance/side</label><span id="d-clr" style="color:#f0a500">—</span></div>
+    <div class="st"><label>Column width</label><span id="d-cs">—</span></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">
+// Set developer email via JS to prevent Cloudflare interception
+(function(){
+  var u='komsan.kongsuwan',d='gmail.com';
+  var el=document.getElementById('dev-email');
+  if(el) el.textContent=u+'@'+d;
+})();
+</script>
+<script>
+// ── Palette ──────────────────────────────────────────────────────────────────
+// 50-item palette (8 base colors cycling with brightness variation)
+var _bc=[0xc0392b,0x2980b9,0x27ae60,0xf39c12,0x8e44ad,0x16a085,0xe67e22,0x1abc9c,
+         0xe74c3c,0x3498db,0x2ecc71,0xf1c40f,0x9b59b6,0x1abc9c,0xe67e22,0x48c9b0,
+         0xa93226,0x1a5276,0x1e8449,0xd68910,0x6c3483,0x0e6655,0xba4a00,0x117a65];
+var _bh=['#c0392b','#2980b9','#27ae60','#f39c12','#8e44ad','#16a085','#e67e22','#1abc9c',
+         '#e74c3c','#3498db','#2ecc71','#f1c40f','#9b59b6','#1abc9c','#e67e22','#48c9b0',
+         '#a93226','#1a5276','#1e8449','#d68910','#6c3483','#0e6655','#ba4a00','#117a65'];
+var ALL_COLORS=[],ALL_HEX=[];
+for(var _i=0;_i<50;_i++){ALL_COLORS.push(_bc[_i%_bc.length]);ALL_HEX.push(_bh[_i%_bh.length]);}
+
+// ── Layout constants (recomputed on every rebuild) ───────────────────────────
+var PW=1.2,PL=1.2,PH=1.5;
+var COLS=10,DEPTHS=10;
+var CS=1.5,DS=1.2,PREP_CS=1.2,PREP_COLS=10;
+var Z0=2.0,LANE_HALF=1.9,LANE_X=0;
+var FORK_REACH=1.68,FORK_LOW=0.13,FORK_HIGH=0.72,EFF_REACH=2.0;
+var TEMP_START_Z=0,TEMP_ZONE_STEP=0;
+
+// items[i]={name,qty,colsNeeded,startCol,color,hex}
+var items=[];
+
+function colZ(c){return Z0+c*CS;}
+function storX(d){return -LANE_HALF-d*DS-DS/2;}
+function prepX(d){return LANE_HALF+d*DS+DS/2;}
+function prepColZ(c){return Z0+c*PREP_CS;}
+// Single shared temp zone: COLS cols × DEPTHS deep, placed after sorting in Z
+function tempColZ(col){ return TEMP_START_Z + col*CS; }  // one shared area
+function tempX(d){ return LANE_HALF + d*CS + CS/2; }
+function tempEnterX(d){ return tempX(d) - EFF_REACH; }
+// Legacy alias kept for compatibility
+function tempZoneColZ(idx,col){ return tempColZ(col); }
+
+
+// ── Globals ───────────────────────────────────────────────────────────────────
+var scene,camera,renderer;
+var forkliftGroup,mastGroup,forkGroup;
+var fk={x:LANE_X,z:Z0,angle:0,forkY:FORK_LOW,carrying:null};
+var storGrid=[],storItemType=[];
+var palletMap=new Map(); // mesh group -> {item, zone}
+var prepGrid=[];
+var playing=false,camMode='free';
+var orbitA={th:0.9,ph:0.55},orbitR=52,topR=38;
+var panX=0,panZ=0; // camera pan offset
+var oDrag=false,oLast={x:0,y:0};
+var prevT=null;
+var wq=[],wHead=null,wPosArrived=false,currentRef=null;
+var loadedCount=0;
+
+// Sort state
+var sortItemIdx=0,itemSortedCount=[],itemSortSlot=[];
+var tempZone=[];
+var tempGrid2=[];  // shared temp: [col] = stack of {mesh,itemIdx}
+
+// ── Item list UI ──────────────────────────────────────────────────────────────
+var itemRows=[
+  {name:'Item A',qty:20},{name:'Item B',qty:20},{name:'Item C',qty:20},
+  {name:'Item D',qty:20},{name:'Item E',qty:20}
+];
+
+function renderItemList(){
+  var list=document.getElementById('item-list');
+  list.innerHTML='';
+  itemRows.forEach(function(row,i){
+    var div=document.createElement('div');div.className='item-row';
+    var dot=document.createElement('span');
+    dot.className='item-dot';dot.style.background=ALL_HEX[i];
+    var ni=document.createElement('input');ni.type='text';
+    ni.value=row.name;ni.placeholder='Name';
+    ni.addEventListener('input',function(){row.name=this.value;scheduleRebuild();});
+    var qi=document.createElement('input');qi.type='number';
+    qi.value=row.qty;qi.min=0;qi.step=1;
+    qi.addEventListener('input',function(){
+      row.qty=Math.max(0,parseInt(this.value)||0);scheduleRebuild();});
+    var rm=document.createElement('button');rm.className='item-rm';rm.textContent='×';
+    rm.addEventListener('click',function(){
+      if(itemRows.length<=1)return;
+      itemRows.splice(i,1);renderItemList();scheduleRebuild();});
+    div.appendChild(dot);div.appendChild(ni);div.appendChild(qi);
+    div.appendChild(rm);
+    list.appendChild(div);
+  });
+}
+
+function addItem(){
+  if(itemRows.length>=50)return;
+  var n=itemRows.length+1;
+  itemRows.push({name:'Item '+n, qty:0});
+  renderItemList();scheduleRebuild();
+}
+
+// ── Derived computations ──────────────────────────────────────────────────────
+function computeDerived(){
+  PW=Math.max(0.6,parseFloat(document.getElementById('inp-pw').value)/100);
+  PL=Math.max(0.6,parseFloat(document.getElementById('inp-pl').value)/100);
+  PH=Math.max(0.5,parseFloat(document.getElementById('inp-ph').value)/100);
+  DEPTHS=Math.max(3,parseInt(document.getElementById('inp-depth').value)||10);
+  // User's intended min columns (never overwrite this input)
+  var userCols=Math.max(2,parseInt(document.getElementById('inp-cols').value)||10);
+  var totalQty=0;
+  itemRows.forEach(function(r){totalQty+=Math.max(0,r.qty||0);});
+  // COLS = max of user's min and what pallets actually need
+  var neededCols=totalQty>0 ? Math.ceil(totalQty/DEPTHS) : userCols;
+  COLS=Math.max(userCols, neededCols);
+  // Always show the effective COLS in the field so it matches the visualization
+  document.getElementById('inp-cols').value=COLS;
+  CS=Math.max(1.5,PW+0.30);
+  DS=PL; PREP_CS=PW;
+  FORK_HIGH=Math.max(0.72,PH*0.48);
+  FORK_REACH=PL*0.84;
+  EFF_REACH=FORK_REACH*0.9+1.1; // mast offset (1.1) + fork arm (FORK_REACH*0.9)
+
+  // Build items from UI rows
+  items=[];var startCol=0;
+  itemRows.forEach(function(row,i){
+    var qty=Math.max(0,row.qty);
+    var cols=qty>0?Math.ceil(qty/DEPTHS):0;
+    items.push({name:row.name||('Item '+(i+1)),qty:qty,
+                colsNeeded:cols,startCol:startCol,
+                color:ALL_COLORS[i],hex:ALL_HEX[i]});
+    startCol+=cols;
+  });
+  PREP_COLS=startCol;
+  var sortEndZ = Z0 + (PREP_COLS-1)*PREP_CS + PREP_CS/2;
+  TEMP_START_Z = sortEndZ + 0.3 + CS/2; // 0.3m edge-to-edge gap then col center
+}
+
+function validateItems(){
+  var total=0;
+  items.forEach(function(it){total+=it.qty;});
+  var cap=COLS*DEPTHS;
+  var err=document.getElementById('val-err');
+  var tot=document.getElementById('val-tot');
+  tot.textContent='Total: '+total+' pallets | '+COLS+' cols × '+DEPTHS+' deep';
+  if(total===0){
+    err.textContent='Add at least 1 pallet';tot.style.color='#e74c3c';return false;
+  }
+  if(total>500){
+    err.textContent='⚠ '+total+' pallets may cause slow rebuild or GPU strain';
+    err.style.color='#f0a500';
+  } else {
+    err.textContent='';
+  }
+  tot.style.color='#6fcf97';return true;
+}
+
+function updateStats(){
+  // Use exact same formulas as floor dimension lines (includes 0.3m border padding)
+  var zMin=Z0-CS/2-0.3, zMax=colZ(COLS-1)+CS/2+0.3;
+  var xStorL=storX(DEPTHS-1)-DS/2-0.3, xStorR=-LANE_HALF;
+  var rW=zMax-zMin, rL=xStorR-xStorL;
+
+  var szMin=prepColZ(0)-PREP_CS/2-0.3;
+  var szMax=prepColZ(PREP_COLS-1)+PREP_CS/2+0.3;
+  var xPrepL=LANE_HALF, xPrepR=prepX(DEPTHS-1)+DS/2+0.3;
+  var sW=szMax-szMin, sL=xPrepR-xPrepL;
+
+  document.getElementById('r-w').textContent=rW.toFixed(1)+' m';
+  document.getElementById('r-l').textContent=rL.toFixed(1)+' m';
+  document.getElementById('r-a').textContent=(rW*rL).toFixed(1)+' m²';
+  document.getElementById('s-w').textContent=sW.toFixed(1)+' m';
+  document.getElementById('s-l').textContent=sL.toFixed(1)+' m';
+  document.getElementById('s-a').textContent=(sW*sL).toFixed(1)+' m²';
+  var clr=(CS-PW)/2;
+  document.getElementById('d-pw').textContent=PW.toFixed(2)+' m';
+  document.getElementById('d-clr').textContent=clr.toFixed(2)+' m';
+  document.getElementById('d-cs').textContent=CS.toFixed(2)+' m';
+}
+
+// ── Scene init ────────────────────────────────────────────────────────────────
+function init(){
+  computeDerived();
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x1a1a2e);
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+  resize();window.addEventListener('resize',resize);
+  camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,200);
+  scene.add(new THREE.AmbientLight(0xffffff,0.42));
+  var sun=new THREE.DirectionalLight(0xfff2d0,1.1);
+  sun.position.set(8,24,6);sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.camera.left=sun.shadow.camera.bottom=-45;
+  sun.shadow.camera.right=sun.shadow.camera.top=45;
+  sun.shadow.camera.far=90;scene.add(sun);
+  var fill=new THREE.DirectionalLight(0xadd8ff,0.25);
+  fill.position.set(-10,10,6);scene.add(fill);
+  buildScene();setupInput();
+  renderItemList();
+  validateItems();updateStats();
+  requestAnimationFrame(loop);
+}
+
+// Language toggle for info card
+function setLang(lang){
+  document.getElementById('info-en').style.display=lang==='en'?'block':'none';
+  document.getElementById('info-th').style.display=lang==='th'?'block':'none';
+  document.getElementById('lang-en').style.background=lang==='en'?'#f0a500':'transparent';
+  document.getElementById('lang-en').style.color=lang==='en'?'#1a1a2e':'#aaa';
+  document.getElementById('lang-en').style.border=lang==='en'?'none':'1px solid #555';
+  document.getElementById('lang-th').style.background=lang==='th'?'#f0a500':'transparent';
+  document.getElementById('lang-th').style.color=lang==='th'?'#1a1a2e':'#aaa';
+  document.getElementById('lang-th').style.border=lang==='th'?'none':'1px solid #555';
+}
+
+// Position mouse guide to right of settings panel
+(function(){
+  function posGuide(){
+    var ui=document.getElementById('ui');
+    var mg=document.getElementById('mouse-guide');
+    if(ui&&mg){
+      var r=ui.getBoundingClientRect();
+      mg.style.left=(r.right+10)+'px';
+      mg.style.top=r.bottom-mg.offsetHeight+'px';
+      if(parseInt(mg.style.top)<80) mg.style.top='80px';
+    }
+  }
+  window.addEventListener('load',posGuide);
+  window.addEventListener('resize',posGuide);
+  setTimeout(posGuide,150);
+})();
+
+// Position info card below player
+(function(){
+  function pos(){
+    var p=document.getElementById('player');
+    var ic=document.getElementById('info-card');
+    if(p&&ic){ic.style.top=(p.getBoundingClientRect().bottom+10)+'px';}
+  }
+  window.addEventListener('load',pos);
+  window.addEventListener('resize',pos);
+  setTimeout(pos,100);
+})();
+
+function resize(){
+  renderer.setSize(innerWidth,innerHeight);
+  if(camera){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+}
+
+function buildScene(){
+  buildFloor();buildStorage();buildPrepArea();buildForklift();initSortState();
+}
+
+// ── Clear and rebuild ─────────────────────────────────────────────────────────
+function disposeObject(obj){
+  if(!obj) return;
+  if(obj.geometry) obj.geometry.dispose();
+  if(obj.material){
+    if(Array.isArray(obj.material)) obj.material.forEach(function(m){
+      if(m.map) m.map.dispose(); m.dispose();
+    });
+    else { if(obj.material.map) obj.material.map.dispose(); obj.material.dispose(); }
+  }
+}
+function clearScene(){
+  var keep=[];
+  scene.children.forEach(function(c){if(c instanceof THREE.Light)keep.push(c);});
+  scene.traverse(function(obj){
+    if(!(obj instanceof THREE.Light) && !(obj instanceof THREE.Scene))
+      disposeObject(obj);
+  });
+  scene.children.length=0;
+  keep.forEach(function(c){scene.add(c);});
+  palletMap.clear();
+}
+
+var rebuildTimer=null, isRebuilding=false;
+function scheduleRebuild(){
+  clearTimeout(rebuildTimer);
+  rebuildTimer=setTimeout(function(){
+    if(isRebuilding) return;
+    isRebuilding=true;
+    try{
+      computeDerived();
+      if(!validateItems()){updateStats();isRebuilding=false;return;}
+      doFullReset(true);
+      updateStats();
+    } catch(e){ console.warn('Rebuild error:',e); }
+    isRebuilding=false;
+  },1200);
+}
+// ── Floor ─────────────────────────────────────────────────────────────────────
+function buildFloor(){
+  // Compute full extents of all areas to center grid
+  var zMin=Z0-CS/2-0.3, zMax=colZ(COLS-1)+CS/2+0.3;
+  var xStorL=storX(DEPTHS-1)-DS/2-0.3, xStorR=-LANE_HALF;
+  var xPrepL=LANE_HALF;
+  var xPrepR=(PREP_COLS>0)?prepX(DEPTHS-1)+DS/2+0.3:xPrepL;
+  // Temp zone right edge
+  var xTempR=tempX(DEPTHS-1)+DS/2+0.3;
+  var szMin=(PREP_COLS>0)?prepColZ(0)-PREP_CS/2-0.3:zMin;
+  var szMax=(PREP_COLS>0)?prepColZ(PREP_COLS-1)+PREP_CS/2+0.3:zMax;
+  var tzMax=(items.length>0)?(tempColZ(COLS-1)+CS/2+0.3):szMax;
+
+  // Center of all areas combined
+  var allXMin=xStorL, allXMax=Math.max(xPrepR,xTempR);
+  var allZMin=Math.min(zMin,szMin), allZMax=Math.max(zMax,szMax,tzMax);
+  var cx=(allXMin+allXMax)/2, cz=(allZMin+allZMax)/2;
+  var gW=Math.ceil((allXMax-allXMin)*1.6+20);
+  var gD=Math.ceil((allZMax-allZMin)*1.6+20);
+  var gSize=Math.max(gW,gD);
+  var gDivs=Math.max(20,Math.min(80,Math.round(gSize/3)));
+
+  var f=new THREE.Mesh(new THREE.PlaneGeometry(gSize*1.5,gSize*1.5),
+    new THREE.MeshLambertMaterial({color:0x22222e}));
+  f.rotation.x=-Math.PI/2; f.position.set(cx,0,cz);
+  f.receiveShadow=true; scene.add(f);
+  var grid=new THREE.GridHelper(gSize*1.5,gDivs,0x2e2e3a,0x272733);
+  grid.position.set(cx,0,cz); scene.add(grid);
+
+  // Receiving floor
+  var zCtr=(zMin+zMax)/2, zLen=zMax-zMin;
+
+  // Receiving zone floor (green-tinted)
+  zonFloor(0x2e3a28,(xStorL+xStorR)/2,zCtr,xStorR-xStorL,zLen);
+  addFloorLabel('RECEIVING\nAREA',(xStorL+xStorR)/2,zCtr,'#6fcf97',5.5);
+
+  // Column numbers along lane edge (Z axis), Row numbers along left edge (X axis)
+  for(var c=0;c<COLS;c++)
+    addSmallLabel('C'+(c+1), xStorR+0.6, colZ(c), '#aaffaa');
+  for(var d=0;d<DEPTHS;d++)
+    addSmallLabel('R'+(d+1), storX(d), zMin-0.7, '#aaffaa');
+
+  // Sorting floor
+  if(PREP_COLS>0){
+    var xPrepR=prepX(DEPTHS-1)+DS/2+0.3;
+    var xPCtr=(xPrepL+xPrepR)/2;
+    var szMin=prepColZ(0)-PREP_CS/2-0.3;
+    var szMax=prepColZ(PREP_COLS-1)+PREP_CS/2+0.3;
+    zonFloor(0x263040,xPCtr,(szMin+szMax)/2,xPrepR-xPrepL,szMax-szMin);
+    var ym=new THREE.MeshBasicMaterial({color:0xf0a500});
+    hLine(ym,xPrepL,xPrepR,szMin);hLine(ym,xPrepL,xPrepR,szMax);
+    vLine(ym,xPrepL,szMin,szMax);vLine(ym,xPrepR,szMin,szMax);
+    addFloorLabel('SORTING &\nSTORAGE',xPCtr,(szMin+szMax)/2,'#56b4d3',4.5);
+
+    // Sorting column numbers along lane edge, row numbers along left edge
+    for(var sc=0;sc<PREP_COLS;sc++)
+      addSmallLabel('C'+(sc+1), xPrepL-0.6, prepColZ(sc), '#aabbff');
+    for(var sd=0;sd<DEPTHS;sd++)
+      addSmallLabel('R'+(sd+1), prepX(sd), szMin-0.7, '#aabbff');
+
+    floorDimZ(xPrepR+1.0,szMin,szMax,(szMax-szMin).toFixed(1)+' m','right');
+    floorDimX(xPrepL,xPrepR,szMin-1.0,(xPrepR-xPrepL).toFixed(1)+' m');
+
+    // Temp area - clean floor, no decoration
+  }
+
+  var ym2=new THREE.MeshBasicMaterial({color:0xf0a500});
+  hLine(ym2,xStorL,xStorR,zMin);hLine(ym2,xStorL,xStorR,zMax);
+  vLine(ym2,xStorL,zMin,zMax);vLine(ym2,xStorR,zMin,zMax);
+
+  var wm=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.18});
+  for(var z=zMin;z<zMax;z+=1.2)hLine(wm,-0.05,0.05,z+0.5);
+
+  floorDimZ(xStorL-1.0,zMin,zMax,(zMax-zMin).toFixed(1)+' m','left');
+  floorDimX(xStorL,xStorR,zMin-1.0,(xStorR-xStorL).toFixed(1)+' m');
+}
+
+function zonFloor(color,cx,cz,w,d){
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(0.01,w),Math.max(0.01,d)),
+    new THREE.MeshLambertMaterial({color:color}));
+  m.rotation.x=-Math.PI/2;m.position.set(cx,0.005,cz);scene.add(m);
+}
+function hLine(mat,x1,x2,z){
+  if(Math.abs(x2-x1)<0.01)return;
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(x2-x1),0.1),mat);
+  m.rotation.x=-Math.PI/2;m.position.set((x1+x2)/2,0.012,z);scene.add(m);
+}
+function vLine(mat,x,z1,z2){
+  if(Math.abs(z2-z1)<0.01)return;
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(0.1,Math.abs(z2-z1)),mat);
+  m.rotation.x=-Math.PI/2;m.position.set(x,0.012,(z1+z2)/2);scene.add(m);
+}
+function addFloorLabel(text,cx,cz,color,scale){
+  var lines=text.split('\n');
+  var cw=512,lh=110,ch=lh*lines.length+30;
+  var c=document.createElement('canvas');c.width=cw;c.height=ch;
+  var ctx=c.getContext('2d');
+  ctx.clearRect(0,0,cw,ch);
+  ctx.fillStyle=color||'#fff';
+  ctx.font='bold 88px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+  lines.forEach(function(l,i){ctx.fillText(l,cw/2,lh/2+lh*i+15);});
+  var s=scale||4;
+  var mesh=new THREE.Mesh(new THREE.PlaneGeometry(s*(cw/ch),s),
+    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),
+      transparent:true,opacity:0.22,depthWrite:false,side:THREE.DoubleSide}));
+  mesh.rotation.x=-Math.PI/2;mesh.position.set(cx,0.02,cz);scene.add(mesh);
+}
+function addSmallLabel(text,cx,cz,color){
+  var c=document.createElement('canvas');c.width=160;c.height=80;
+  var ctx=c.getContext('2d');
+  ctx.clearRect(0,0,160,80);
+  ctx.fillStyle=color||'#ffffff';
+  ctx.font='bold 52px Arial';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(text,80,40);
+  var mesh=new THREE.Mesh(new THREE.PlaneGeometry(CS*0.7,CS*0.36),
+    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),
+      transparent:true,opacity:0.90,depthWrite:false,side:THREE.DoubleSide}));
+  mesh.rotation.x=-Math.PI/2;
+  mesh.position.set(cx,0.025,cz);
+  scene.add(mesh);
+}
+
+function floorDimZ(x,z1,z2,label,side){
+  // side: 'right' = label on right (+Z), 'left' = label on left (-Z), default 'left'
+  var y=0.06,tk=0.38,lm=new THREE.LineBasicMaterial({color:0xffffff});
+  function seg(pts){var g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pts),3));
+    scene.add(new THREE.Line(g,lm));}
+  seg([x,y,z1,x,y,z2]);
+  seg([x-tk,y,z1,x+tk,y,z1]);seg([x-tk,y,z2,x+tk,y,z2]);
+  // For receiving (line on left of area): label goes further left (away from area)
+  // For sorting  (line on right of area): label goes further right (away from area)
+  var offset=(side==='right')?1.6:-1.6;
+  var gr=new THREE.Group();gr.position.set(x+offset,0,(z1+z2)/2);
+  gr.rotation.y=Math.PI/2;gr.add(dimMesh(label));scene.add(gr);
+}
+function floorDimX(x1,x2,z,label){
+  var y=0.06,tk=0.38,lm=new THREE.LineBasicMaterial({color:0xffffff});
+  function seg(pts){var g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pts),3));
+    scene.add(new THREE.Line(g,lm));}
+  seg([x1,y,z,x2,y,z]);
+  seg([x1,y,z-tk,x1,y,z+tk]);seg([x2,y,z-tk,x2,y,z+tk]);
+  var gr=new THREE.Group();gr.position.set((x1+x2)/2,0,z-1.6);
+  gr.add(dimMesh(label));scene.add(gr);
+}
+function dimMesh(text){
+  var c=document.createElement('canvas');c.width=640;c.height=160;
+  var ctx=c.getContext('2d');
+  ctx.clearRect(0,0,640,160);
+  ctx.fillStyle='#ffffff';
+  ctx.font='bold 100px Arial';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(text,320,80);
+  var mesh=new THREE.Mesh(new THREE.PlaneGeometry(3.5,3.5*(160/640)),
+    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),
+      transparent:true,depthWrite:false,side:THREE.DoubleSide}));
+  mesh.rotation.x=-Math.PI/2;return mesh;
+}
+// ── Storage & Prep ────────────────────────────────────────────────────────────
+function buildStorage(){
+  var assignment=[];
+  items.forEach(function(it){for(var k=0;k<it.qty;k++)assignment.push(it);});
+  for(var ai=assignment.length-1;ai>0;ai--){
+    var aj=Math.floor(Math.random()*(ai+1));
+    var t=assignment[ai];assignment[ai]=assignment[aj];assignment[aj]=t;
+  }
+  storGrid=[];storItemType=[];
+  var idx=0;
+  for(var d=0;d<DEPTHS;d++){
+    storGrid[d]=[];storItemType[d]=[];
+    for(var c=0;c<COLS;c++){
+      if(idx<assignment.length){
+        var it=assignment[idx++];
+        storItemType[d][c]=it;
+        var m=makePallet(it.color);
+        m.position.set(storX(d),0,colZ(c));
+        scene.add(m);storGrid[d][c]=m;
+        palletMap.set(m,{item:it,zone:'Receiving',col:c+1,depth:d+1});
+      } else {
+        storItemType[d][c]=null;
+        storGrid[d][c]=null;
+      }
+    }
+  }
+}
+function buildPrepArea(){
+  prepGrid=[];
+  for(var d=0;d<DEPTHS;d++){
+    prepGrid[d]=[];
+    for(var c=0;c<PREP_COLS;c++) prepGrid[d][c]=null;
+  }
+}
+function makePallet(cargoColor){
+  var g=new THREE.Group();
+  var dm=new THREE.MeshLambertMaterial({color:0x9B7040});
+  var sm=new THREE.MeshLambertMaterial({color:0x7A5828});
+  var td=new THREE.Mesh(new THREE.BoxGeometry(PW,0.07,PL),dm);
+  td.position.y=0.115;td.castShadow=true;td.receiveShadow=true;g.add(td);
+  for(var i=0;i<3;i++){
+    var s=new THREE.Mesh(new THREE.BoxGeometry(PW,0.09,0.09),sm);
+    s.position.set(0,0.045,-PL/2+i*(PL/2));g.add(s);
+  }
+  var bd=new THREE.Mesh(new THREE.BoxGeometry(PW,0.06,PL),dm);
+  bd.position.y=0.03;g.add(bd);
+  var cargo=new THREE.Mesh(new THREE.BoxGeometry(PW*0.88,PH-0.15,PL*0.88),
+    new THREE.MeshLambertMaterial({color:cargoColor||0xaaaaaa}));
+  cargo.position.y=0.15+(PH-0.15)/2;cargo.castShadow=true;g.add(cargo);
+  var wrap=new THREE.Mesh(new THREE.BoxGeometry(PW*0.9,PH*0.32,PL*0.9),
+    new THREE.MeshLambertMaterial({color:0xd4caa0,transparent:true,opacity:0.22}));
+  wrap.position.y=0.15+PH*0.16;g.add(wrap);
+  return g;
+}
+
+// ── Forklift ──────────────────────────────────────────────────────────────────
+function buildForklift(){
+  if(forkliftGroup)scene.remove(forkliftGroup);
+  forkliftGroup=new THREE.Group();
+  var Y=new THREE.MeshLambertMaterial({color:0xf0a500});
+  var D=new THREE.MeshLambertMaterial({color:0x181818});
+  var B=new THREE.MeshLambertMaterial({color:0x2266cc});
+  var GL=new THREE.MeshLambertMaterial({color:0xffffaa,emissive:0xffee66,emissiveIntensity:0.7});
+  function add(p,d,m,pos){var o=new THREE.Mesh(new THREE.BoxGeometry(d[0],d[1],d[2]),m);
+    o.position.set(pos[0],pos[1],pos[2]);o.castShadow=true;p.add(o);}
+  add(forkliftGroup,[1.1,1.05,2.2],Y,[0,0.70,0]);
+  add(forkliftGroup,[1.0,0.44,0.88],Y,[0,1.45,-0.66]);
+  add(forkliftGroup,[0.9,0.10,1.10],Y,[0,1.84,0.24]);
+  add(forkliftGroup,[0.88,0.54,0.05],B,[0,1.54,-0.22]);
+  add(forkliftGroup,[1.06,0.70,0.36],D,[0,0.50,-1.24]);
+  add(forkliftGroup,[0.28,0.14,0.06],GL,[0,0.95,1.16]);
+  add(forkliftGroup,[0.28,0.14,0.06],GL,[0,1.13,1.16]);
+  var wg=new THREE.CylinderGeometry(0.24,0.24,0.24,14);
+  [[0.56,0.22,0.86],[-0.56,0.22,0.86],[0.56,0.22,-0.86],[-0.56,0.22,-0.86]].forEach(function(wp){
+    var w=new THREE.Mesh(wg,D);w.rotation.z=Math.PI/2;
+    w.position.set(wp[0],wp[1],wp[2]);forkliftGroup.add(w);});
+  mastGroup=new THREE.Group();mastGroup.position.set(0,0,1.1);
+  var mg=new THREE.BoxGeometry(0.09,2.9,0.09);
+  var mL=new THREE.Mesh(mg,D);mL.position.set(-0.39,1.45,0);mastGroup.add(mL);
+  var mR=new THREE.Mesh(mg,D);mR.position.set(0.39,1.45,0);mastGroup.add(mR);
+  add(mastGroup,[0.86,0.09,0.09],D,[0,2.9,0]);
+  forkGroup=new THREE.Group();
+  var fkLen=Math.max(0.8,PL*0.90);
+  var fg=new THREE.BoxGeometry(0.09,0.07,fkLen);
+  var fL=new THREE.Mesh(fg,D);fL.position.set(-0.28,0,fkLen/2);forkGroup.add(fL);
+  var fR=new THREE.Mesh(fg,D);fR.position.set(0.28,0,fkLen/2);forkGroup.add(fR);
+  add(forkGroup,[0.74,0.52,0.07],D,[0,0.26,0]);
+  forkGroup.position.y=FORK_LOW;mastGroup.add(forkGroup);
+  forkliftGroup.add(mastGroup);
+  forkliftGroup.position.set(fk.x,0,fk.z);
+  forkliftGroup.rotation.y=fk.angle;scene.add(forkliftGroup);
+}
+
+// ── Measurement annotation ────────────────────────────────────────────────────
+// ── Sort state ────────────────────────────────────────────────────────────────
+function initSortState(){
+  sortItemIdx=0;itemSortedCount=[];itemSortSlot=[];tempZone=[];
+  items.forEach(function(it,i){
+    itemSortedCount[i]=0;itemSortSlot[i]=0;
+    tempZone[i]=null;
+  });
+  // Init shared temp grid
+  tempGrid2=[];
+  for(var tc=0;tc<COLS;tc++) tempGrid2.push([]);
+}
+
+function nextSortPos(idx){
+  var slot=itemSortSlot[idx];
+  var it=items[idx];
+  var localCol=Math.floor(slot/DEPTHS);
+  var pc=it.startCol+localCol;
+  var pd=(DEPTHS-1)-(slot%DEPTHS);
+  return {pc:pc,pd:pd};
+}
+
+function ensureTempGrid(maxCol){
+  while(tempGrid2.length<=maxCol) tempGrid2.push([]);
+}
+
+function tempDropPos(itemIdx){
+  var it=items[itemIdx];
+  if(!it||it.colsNeeded===0) return null;
+  var startCol=it.startCol;
+  var endCol=it.startCol+it.colsNeeded-1;
+  ensureTempGrid(endCol);
+  // Fill rightmost col first, back-to-front within col
+  for(var c=endCol;c>=startCol;c--){
+    if(tempGrid2[c].length<DEPTHS){
+      var count=tempGrid2[c].length;
+      return {col:c, pd:(DEPTHS-1)-count, pz:tempColZ(c)};
+    }
+  }
+  return {col:startCol, pd:0, pz:tempColZ(startCol)};
+}
+
+function tempPickPos(itemIdx){
+  var it=items[itemIdx];
+  if(!it||it.colsNeeded===0) return null;
+  var startCol=it.startCol;
+  var endCol=it.startCol+it.colsNeeded-1;
+  ensureTempGrid(endCol);
+  for(var c=startCol;c<=endCol;c++){
+    var arr=tempGrid2[c];
+    if(!arr||!arr.length)continue;
+    var si=arr.length-1;
+    return {col:c, stackIdx:si, pd:(DEPTHS-1)-si, pz:tempColZ(c), mesh:arr[si].mesh};
+  }
+  return null;
+}
+
+function colFront(c){
+  for(var d=0;d<DEPTHS;d++)if(storGrid[d]&&storGrid[d][c])return{sd:d,sc:c};
+  return null;
+}
+
+function makeTrip(px,pz,dx,dz,pa,da){
+  wq=[];
+  wp(LANE_X,pz,FORK_LOW,false,null);
+  wp(px,pz,FORK_LOW,false,pa);
+  wp(px,pz,FORK_HIGH,false,null);
+  wp(LANE_X,pz,FORK_HIGH,true,null);
+  wp(LANE_X,dz,FORK_HIGH,false,null);
+  wp(dx,dz,FORK_HIGH,false,da);
+  wp(dx,dz,FORK_LOW,false,null);
+  wp(LANE_X,dz,FORK_LOW,true,null);
+  wHead=null;wPosArrived=false;nextWP();
+}
+function wp(x,z,fy,rev,action){wq.push({x:x,z:z,forkY:fy,reverse:rev,action:action});}
+function nextWP(){
+  if(!wq.length){planPick();return;}
+  wHead=wq.shift();wPosArrived=false;
+}
+
+// ── Main planning ─────────────────────────────────────────────────────────────
+function planPick(){
+  if(!items.length){playing=false;return;}
+  // Advance past fully sorted items
+  while(sortItemIdx<items.length &&
+        (items[sortItemIdx].qty===0 ||
+         itemSortedCount[sortItemIdx]>=items[sortItemIdx].qty)){
+    sortItemIdx++;
+  }
+  if(sortItemIdx>=items.length){
+    playing=false;
+    document.getElementById('btn-play').innerHTML='Done';
+    document.getElementById('status').textContent='All pallets sorted!';
+    return;
+  }
+  var idx=sortItemIdx;
+  var it=items[idx];
+
+  // 1. Rescue from temp (col 0 first, LIFO = front-to-back)
+  var tpp=tempPickPos(idx);
+  if(tpp){
+    var sp=nextSortPos(idx);itemSortSlot[idx]++;
+    currentRef={itemIdx:idx,fromTemp:true,tempCol:tpp.col,tempStackIdx:tpp.stackIdx,pd:sp.pd,pc:sp.pc};
+    document.getElementById('status').textContent=
+      it.name+': TEMP\u2192Sort C'+(sp.pc+1)+' D'+(sp.pd+1);
+    makeTrip(tempEnterX(tpp.pd),tpp.pz,
+             prepX(sp.pd)-EFF_REACH,prepColZ(sp.pc),'pickup_temp','dropoff');
+    return;
+  }
+
+  // 2. Direct from receiving (front of column)
+  for(var c=0;c<COLS;c++){
+    var ref=colFront(c);
+    if(ref&&storItemType[ref.sd][ref.sc]===it){
+      var sp2=nextSortPos(idx);itemSortSlot[idx]++;
+      currentRef={sd:ref.sd,sc:ref.sc,itemIdx:idx,pd:sp2.pd,pc:sp2.pc};
+      document.getElementById('status').textContent=
+        it.name+': C'+(ref.sc+1)+' D'+(ref.sd+1)+'\u2192Sort C'+(sp2.pc+1)+' D'+(sp2.pd+1);
+      makeTrip(storX(ref.sd)+EFF_REACH,colZ(ref.sc),
+               prepX(sp2.pd)-EFF_REACH,prepColZ(sp2.pc),'pickup','dropoff');
+      return;
+    }
+  }
+
+  // 3. Move blocker to its temp zone (far col first = right-to-left)
+  for(var c2=0;c2<COLS;c2++){
+    var ref2=colFront(c2);
+    if(ref2){
+      var blkIt=storItemType[ref2.sd][ref2.sc];
+      var blkIdx=items.indexOf(blkIt);if(blkIdx<0)blkIdx=0;
+      var tdp=tempDropPos(blkIdx);
+      currentRef={sd:ref2.sd,sc:ref2.sc,itemIdx:blkIdx,toTemp:true,
+                  tempCol:tdp.col,tempPd:tdp.pd,tempPz:tdp.pz};
+      document.getElementById('status').textContent=
+        blkIt.name+': C'+(ref2.sc+1)+' D'+(ref2.sd+1)+'\u2192TEMP'+(blkIdx+1);
+      makeTrip(storX(ref2.sd)+EFF_REACH,colZ(ref2.sc),
+               tempEnterX(tdp.pd),tdp.pz,'pickup','dropoff_temp');
+      return;
+    }
+  }
+  playing=false;document.getElementById('status').textContent='Complete!';
+}
+
+
+function handleArrival(w){
+  if(w.action==='pickup'&&currentRef){
+    var d=currentRef.sd,c=currentRef.sc;
+    var m=storGrid[d]&&storGrid[d][c];
+    if(m){storGrid[d][c]=null;scene.remove(m);forkGroup.add(m);
+      m.position.set(0,0,FORK_REACH*0.9);m.rotation.set(0,0,0);fk.carrying=m;}
+  }
+  if(w.action==='pickup_temp'&&currentRef){
+    var tc=currentRef.tempCol, si=currentRef.tempStackIdx;
+    var arr=tempGrid2[tc];
+    if(arr.length>0 && si<arr.length){
+      var top=arr[si];
+      if(top&&top.mesh){scene.remove(top.mesh);forkGroup.add(top.mesh);
+        top.mesh.position.set(0,0,FORK_REACH*0.9);top.mesh.rotation.set(0,0,0);
+        fk.carrying=top.mesh;}
+      arr.splice(si,1);
+    }
+  }
+  if(w.action==='dropoff'&&fk.carrying){
+    var m2=fk.carrying,v=new THREE.Vector3();
+    m2.getWorldPosition(v);forkGroup.remove(m2);scene.add(m2);
+    m2.position.set(v.x,0,v.z);m2.rotation.set(0,0,0);fk.carrying=null;
+    if(currentRef){
+      prepGrid[currentRef.pd][currentRef.pc]=m2;
+      palletMap.set(m2,{item:items[currentRef.itemIdx],zone:'Sorting',
+        col:currentRef.pc+1,depth:currentRef.pd+1});
+    }
+    itemSortedCount[currentRef.itemIdx]++;
+    loadedCount++;
+    document.getElementById('loaded').textContent=loadedCount;
+  }
+  if(w.action==='dropoff_temp'&&fk.carrying&&currentRef){
+    var m3=fk.carrying,v2=new THREE.Vector3();
+    m3.getWorldPosition(v2);forkGroup.remove(m3);scene.add(m3);
+    m3.position.set(v2.x,0,v2.z);m3.rotation.set(0,0,0);fk.carrying=null;
+    tempGrid2[currentRef.tempCol].push({mesh:m3, itemIdx:currentRef.itemIdx});
+  }
+}
+// ── Main loop ─────────────────────────────────────────────────────────────────
+function loop(ts){
+  requestAnimationFrame(loop);
+  var dt=prevT?Math.min((ts-prevT)/1000,0.05):0;prevT=ts;
+  var spd=parseFloat(document.getElementById('speed').value);
+
+  if(playing&&wHead){
+    var moveSpd=spd*3.0,rotSpd=spd*3.2,forkSpd=spd*1.6;
+    var df=wHead.forkY-fk.forkY;
+    if(Math.abs(df)>0.005){
+      fk.forkY+=Math.sign(df)*Math.min(Math.abs(df),forkSpd*dt);
+      forkGroup.position.y=fk.forkY;
+    }
+    var tx=wHead.x,tz=wHead.z,ddx=tx-fk.x,ddz=tz-fk.z;
+    var dist=Math.sqrt(ddx*ddx+ddz*ddz);
+    if(wPosArrived||dist<0.06){
+      if(!wPosArrived){
+        wPosArrived=true;fk.x=tx;fk.z=tz;
+        forkliftGroup.position.set(fk.x,0,fk.z);
+        if(wHead.action){handleArrival(wHead);wHead.action=null;}
+      }
+      if(Math.abs(fk.forkY-wHead.forkY)<0.01){
+        fk.forkY=wHead.forkY;forkGroup.position.y=fk.forkY;nextWP();
+      }
+    } else {
+      var tAngle=wHead.reverse?Math.atan2(-(tx-fk.x),-(tz-fk.z))
+                              :Math.atan2((tx-fk.x),(tz-fk.z));
+      var da=tAngle-fk.angle;
+      while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;
+      fk.angle+=Math.sign(da)*Math.min(Math.abs(da),rotSpd*dt);
+      forkliftGroup.rotation.y=fk.angle;
+      if(Math.abs(da)<0.15){
+        var mv=Math.min(dist,moveSpd*dt);
+        fk.x+=ddx/dist*mv;fk.z+=ddz/dist*mv;
+        forkliftGroup.position.set(fk.x,0,fk.z);
+      }
+    }
+  }
+
+
+
+  updateCam();renderer.render(scene,camera);
+}
+
+// ── Camera ────────────────────────────────────────────────────────────────────
+function updateCam(){
+  // Center camera on all areas combined
+  var zMn=Z0-CS/2, zMx=colZ(COLS-1)+CS/2;
+  var xL=storX(DEPTHS-1)-DS/2, xR=(PREP_COLS>0)?prepX(DEPTHS-1)+DS/2:LANE_HALF;
+  var cx=(xL+xR)/2, cz=(zMn+zMx)/2;
+  if(camMode==='free'){
+    var ox=Math.sin(orbitA.th)*Math.sin(orbitA.ph)*orbitR;
+    var oy=Math.cos(orbitA.ph)*orbitR;
+    var oz=Math.cos(orbitA.th)*Math.sin(orbitA.ph)*orbitR;
+    camera.position.set(cx+panX+ox,oy+2,cz+panZ+oz);
+    camera.lookAt(cx+panX,1.5,cz+panZ);
+  } else if(camMode==='follow'){
+    camera.position.set(fk.x-8*Math.sin(fk.angle),5,fk.z-8*Math.cos(fk.angle));
+    camera.lookAt(fk.x,1.2,fk.z);
+  } else if(camMode==='top'){
+    camera.position.set(cx+panX,topR,cz+panZ);
+    camera.lookAt(cx+panX,0,cz+panZ);
+  } else {
+    camera.position.set(fk.x+0.3*Math.cos(-fk.angle),2.1,fk.z+0.3*Math.sin(-fk.angle));
+    camera.lookAt(fk.x+6*Math.sin(fk.angle),1.8,fk.z+6*Math.cos(fk.angle));
+  }
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+function setupInput(){
+  var el=renderer.domElement;
+  // ── Tooltip raycaster ────────────────────────────────────────────────────
+  var raycaster=new THREE.Raycaster();
+  var mouse=new THREE.Vector2();
+  var tooltip=document.getElementById('tooltip');
+  window.addEventListener('mousemove',function(e){
+    if(oDrag){tooltip.style.display='none';return;}
+    mouse.x=(e.clientX/innerWidth)*2-1;
+    mouse.y=-(e.clientY/innerHeight)*2+1;
+    raycaster.setFromCamera(mouse,camera);
+    var hits=raycaster.intersectObjects(scene.children,true);
+    var found=null;
+    for(var hi=0;hi<hits.length;hi++){
+      var obj=hits[hi].object;
+      // Walk up to find group in palletMap
+      var cur=obj;
+      while(cur){
+        if(palletMap.has(cur)){found=cur;break;}
+        cur=cur.parent;
+      }
+      if(found) break;
+    }
+    if(found){
+      var info=palletMap.get(found);
+      tooltip.innerHTML='<span class="tt-color" style="background:'+info.item.hex+'"></span>'+
+        '<b>'+info.item.name+'</b><br>'+
+        'Zone: '+info.zone+'&nbsp;&nbsp;Col: '+info.col+'&nbsp;&nbsp;Depth: '+info.depth;
+      tooltip.style.display='block';
+      tooltip.style.left=(e.clientX+14)+'px';
+      tooltip.style.top=(e.clientY-10)+'px';
+    } else {
+      tooltip.style.display='none';
+    }
+  });
+  el.addEventListener('mouseleave',function(){tooltip.style.display='none';});
+
+  el.addEventListener('mousedown',function(e){oDrag=true;oLast={x:e.clientX,y:e.clientY};});
+  window.addEventListener('mouseup',function(){oDrag=false;});
+  window.addEventListener('mousemove',function(e){
+    if(!oDrag||camMode!=='free')return;
+    orbitA.th-=(e.clientX-oLast.x)*0.008;
+    orbitA.ph=Math.max(0.08,Math.min(Math.PI*0.46,orbitA.ph-(e.clientY-oLast.y)*0.008));
+    oLast={x:e.clientX,y:e.clientY};
+  });
+  el.addEventListener('wheel',function(e){
+    e.preventDefault();
+    if(e.shiftKey){
+      // Shift+scroll = horizontal pan (Z axis)
+      panZ+=e.deltaY*0.04;
+    } else if(e.altKey){
+      // Alt+scroll = vertical pan (X axis)
+      panX+=e.deltaY*0.04;
+    } else if(camMode==='top'){
+      topR=Math.max(5,Math.min(120,topR+e.deltaY*0.05));
+    } else {
+      orbitR=Math.max(5,Math.min(80,orbitR+e.deltaY*0.03));
+    }
+  },{passive:false});
+
+  // Middle mouse button drag = pan
+  var midDrag=false,midLast={x:0,y:0};
+  el.addEventListener('mousedown',function(e){
+    if(e.button===1){midDrag=true;midLast={x:e.clientX,y:e.clientY};e.preventDefault();}
+  });
+  window.addEventListener('mouseup',function(e){if(e.button===1)midDrag=false;});
+  window.addEventListener('mousemove',function(e){
+    if(!midDrag)return;
+    var dx=e.clientX-midLast.x, dy=e.clientY-midLast.y;
+    var panSpeed=orbitR*0.002;
+    // Pan in camera-relative direction
+    panX-=Math.cos(orbitA.th)*dx*panSpeed;
+    panZ+=Math.sin(orbitA.th)*dx*panSpeed;
+    panX+=Math.sin(orbitA.th)*Math.cos(orbitA.ph)*dy*panSpeed*0.5;
+    panZ+=Math.cos(orbitA.th)*Math.cos(orbitA.ph)*dy*panSpeed*0.5;
+    midLast={x:e.clientX,y:e.clientY};
+  });
+  el.addEventListener('touchstart',function(e){oDrag=true;oLast={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
+  window.addEventListener('touchend',function(){oDrag=false;});
+  el.addEventListener('touchmove',function(e){
+    if(!oDrag||camMode!=='free'||e.touches.length!==1)return;
+    orbitA.th-=(e.touches[0].clientX-oLast.x)*0.008;
+    orbitA.ph=Math.max(0.08,Math.min(Math.PI*0.46,orbitA.ph-(e.touches[0].clientY-oLast.y)*0.008));
+    oLast={x:e.touches[0].clientX,y:e.touches[0].clientY};
+  },{passive:true});
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function doFullReset(keepScene){
+  panX=0;panZ=0;
+  playing=false;wq=[];wHead=null;wPosArrived=false;currentRef=null;
+  if(fk.carrying){forkGroup.remove(fk.carrying);fk.carrying=null;}
+  if(typeof tempZone!=='undefined')
+    tempGrid2.forEach(function(col){
+      col.forEach(function(slot){if(slot&&slot.mesh)scene.remove(slot.mesh);});
+    });
+    tempGrid2=[];
+    for(var rtc=0;rtc<COLS;rtc++) tempGrid2.push([]);
+  fk.x=LANE_X;fk.z=colZ(0);fk.angle=0;fk.forkY=FORK_LOW;loadedCount=0;
+  document.getElementById('loaded').textContent='0';
+  document.getElementById('hud-tot').textContent=' / '+(COLS*DEPTHS);
+  document.getElementById('status').textContent='Ready';
+  document.getElementById('btn-play').innerHTML='&#9654; Start';
+  if(!keepScene){clearScene();buildScene();}
+  else{clearScene();buildScene();}
+}
+
+// ── Fill Sort Instantly ───────────────────────────────────────────────────────
+function fillTempInstant(){
+  // Stop any running simulation
+  playing=false;
+  wq=[];wHead=null;wPosArrived=false;currentRef=null;
+  if(fk.carrying){forkGroup.remove(fk.carrying);fk.carrying=null;}
+  document.getElementById('btn-play').innerHTML='&#9654; Start';
+
+  // Move ALL pallets from receiving directly to sorting area instantly
+  for(var d=0;d<DEPTHS;d++){
+    for(var c=0;c<COLS;c++){
+      var mesh=storGrid[d]&&storGrid[d][c];
+      if(!mesh) continue;
+      var it=storItemType[d][c];
+      if(!it) continue;
+
+      var idx=items.indexOf(it);
+      if(idx<0) continue;
+
+      // Get next sort position for this item
+      var sp=nextSortPos(idx);
+      if(itemSortSlot[idx]<it.qty) itemSortSlot[idx]++;
+
+      // Move mesh to sorting position instantly
+      scene.remove(mesh);
+      mesh.position.set(prepX(sp.pd),0,prepColZ(sp.pc));
+      scene.add(mesh);
+
+      // Update grids
+      storGrid[d][c]=null;
+      storItemType[d][c]=null;
+      prepGrid[sp.pd][sp.pc]=mesh;
+      itemSortedCount[idx]++;
+      loadedCount++;
+    }
+  }
+
+  // Also clear temp area
+  tempGrid2.forEach(function(col){
+    col.forEach(function(slot){if(slot&&slot.mesh)scene.remove(slot.mesh);});
+  });
+  tempGrid2=[];
+  for(var tc=0;tc<COLS+50;tc++) tempGrid2.push([]);
+
+  sortItemIdx=items.length; // mark all done
+  document.getElementById('loaded').textContent=loadedCount;
+  document.getElementById('status').textContent='All pallets sorted!';
+  document.getElementById('btn-play').innerHTML='Done';
+}
+
+// ── File Upload (Excel / CSV) ─────────────────────────────────────────────────
+function handleFileUpload(file){
+  if(!file) return;
+  var reader=new FileReader();
+  var isCSV=file.name.toLowerCase().endsWith('.csv');
+  reader.onload=function(e){
+    try{
+      var rows=[];
+      if(isCSV){
+        // Parse CSV
+        var text=e.target.result;
+        var lines=text.split(/\r?\n/);
+        lines.forEach(function(line){
+          if(!line.trim()) return;
+          var parts=line.split(',');
+          var name=(parts[0]||'').trim().replace(/^"|"$/g,'');
+          var qty=parseInt((parts[1]||'').trim().replace(/^"|"$/g,''));
+          if(name && !isNaN(qty) && qty>0) rows.push({name:name,qty:qty});
+        });
+      } else {
+        // Parse Excel with SheetJS
+        var data=new Uint8Array(e.target.result);
+        var wb=XLSX.read(data,{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var json=XLSX.utils.sheet_to_json(ws,{header:1});
+        json.forEach(function(row){
+          if(!row||!row[0]) return;
+          var name=String(row[0]).trim();
+          var qty=parseInt(row[1]);
+          if(name && !isNaN(qty) && qty>0) rows.push({name:name,qty:qty});
+        });
+      }
+      if(rows.length===0){
+        document.getElementById('val-err').textContent='No valid data found. Check format.';
+        return;
+      }
+      if(rows.length>50){
+        document.getElementById('val-err').textContent='Max 50 items. First 50 loaded.';
+        rows=rows.slice(0,50);
+      }
+      itemRows=rows;
+      renderItemList();
+      scheduleRebuild();
+      document.getElementById('val-err').textContent='';
+    } catch(err){
+      document.getElementById('val-err').textContent='Error reading file: '+err.message;
+    }
+  };
+  if(isCSV) reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+document.getElementById('speed').addEventListener('input',function(e){
+  document.getElementById('sv').textContent=parseFloat(e.target.value).toFixed(1)+'x';
+});
+document.getElementById('btn-play').addEventListener('click',function(){
+  var total=0;items.forEach(function(it){total+=it.qty;});
+  if(loadedCount>=total)return;
+  playing=!playing;
+  document.getElementById('btn-play').innerHTML=playing?'&#9646;&#9646; Pause':'&#9654; Resume';
+  if(playing&&!wHead)planPick();
+});
+document.getElementById('btn-reset').addEventListener('click',function(){doFullReset(false);});
+document.getElementById('btn-fill-temp').addEventListener('click',fillTempInstant);
+document.getElementById('btn-add').addEventListener('click',addItem);
+document.getElementById('file-input').addEventListener('change',function(e){
+  handleFileUpload(e.target.files[0]);
+  this.value='';
+});
+['free','follow','top'].forEach(function(id){
+  document.getElementById('c-'+id).addEventListener('click',function(){
+    camMode=id;
+    document.querySelectorAll('.cam').forEach(function(b){b.classList.remove('on');});
+    document.getElementById('c-'+id).classList.add('on');
+  });
+});
+['inp-pw','inp-pl','inp-ph','inp-cols'].forEach(function(id){
+  document.getElementById(id).addEventListener('input',scheduleRebuild);
+});
+function scheduleCapacityChange(){
+  clearTimeout(rebuildTimer);
+  rebuildTimer=setTimeout(function(){
+    computeDerived();
+    if(!validateItems()){updateStats();return;}
+    doFullReset(false);
+    updateStats();
+  },1200);
+}
+document.getElementById('inp-depth').addEventListener('input',scheduleCapacityChange);
+document.getElementById('inp-cols').addEventListener('input',scheduleRebuild);
+
+// Set developer email via JS to prevent Cloudflare interception
+(function(){
+  var u='komsan.kongsuwan',d='gmail.com';
+  var el=document.getElementById('dev-email');
+  if(el) el.textContent=u+'@'+d;
+})();
+
+renderItemList();
+init();
+</script>
+</body>
+</html>
