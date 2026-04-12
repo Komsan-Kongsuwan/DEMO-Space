@@ -6,25 +6,32 @@
 <title>Forklift Sorting Demo</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#1a1a2e;font-family:Arial,sans-serif;overflow:hidden}
-canvas{display:block}
-#ui{position:absolute;top:80px;left:14px;background:rgba(0,0,0,.82);color:#eee;
-  border-radius:11px;padding:14px 18px;width:222px;font-size:13px;line-height:1.5}
+body{background:#1a1a2e;font-family:Arial,sans-serif;overflow:hidden;
+  display:flex;height:100vh;width:100vw}
+#sidebar{width:250px;min-width:250px;height:100vh;background:rgba(0,0,0,.90);
+  color:#eee;font-size:13px;line-height:1.5;overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;border-right:1px solid #2a2a3e;z-index:10;
+  flex-shrink:0}
+#viewport{flex:1;position:relative;overflow:hidden}
+
+canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%;z-index:0}
+#ui{display:block;padding:14px 18px;font-size:13px;line-height:1.5;flex:1}
 #ui h2{font-size:14px;font-weight:700;color:#fff;margin-bottom:10px}
 .row{display:flex;justify-content:space-between;margin-bottom:6px}
 .row label{color:#aaa}.row span{color:#fff;font-weight:700}
 input[type=range]{width:100%;accent-color:#f0a500;margin-bottom:8px}
 button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
 #btn-play{background:#f0a500;color:#1a1a2e}
-#btn-reset{background:#333;color:#eee}
+#btn-reset{background:#f0a500;color:#1a1a2e}
+#btn-fill-temp{background:#f0a500;color:#1a1a2e}
 .cams{display:flex;gap:5px;margin-top:9px}
-.cam{flex:1;padding:5px 0;border:1px solid #555;border-radius:5px;font-size:11px;
-  background:transparent;color:#aaa;cursor:pointer}
-.cam.on{background:#f0a500;color:#1a1a2e;border-color:#f0a500;font-weight:700}
+.cam{flex:1;padding:5px 0;border:none;border-radius:7px;font-size:11px;
+  background:#1a3a2a;color:#666;cursor:pointer}
+.cam.on{background:#27ae60;color:#fff;font-weight:700}
 #hud{position:absolute;top:14px;right:14px;background:rgba(0,0,0,.82);color:#eee;
   border-radius:11px;padding:12px 16px;font-size:12px;line-height:2;text-align:right}
 #hud b{color:#f0a500;font-size:20px;display:block;line-height:1.2}
-#stats{position:absolute;bottom:14px;right:14px;display:flex;gap:9px;flex-wrap:wrap;
+#stats{position:absolute;bottom:14px;right:14px;z-index:10;display:flex;gap:9px;flex-wrap:wrap;
   justify-content:flex-end;max-width:600px}
 .scard{background:rgba(0,0,0,.80);border-radius:10px;padding:10px 14px;font-size:12px;
   color:#eee;min-width:128px}
@@ -63,34 +70,15 @@ button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;fo
 </style>
 </head>
 <body>
-<!-- Company branding top-left -->
-<div style="position:absolute;top:14px;left:14px;pointer-events:none">
+
+
+
+
+<div id="sidebar">
+<div style="padding:16px 18px 10px;border-bottom:1px solid #2a2a3e;flex-shrink:0">
   <div style="font-size:22px;font-weight:800;color:#f0a500;letter-spacing:0.5px;line-height:1.2">Demo Logistics</div>
-  <div style="font-size:13px;font-weight:500;color:#aaa;letter-spacing:1px;margin-top:2px">DEMO SPACE</div>
+  <div style="font-size:12px;font-weight:500;color:#666;letter-spacing:1px;margin-top:2px">DEMO SPACE</div>
 </div>
-
-<!-- Player card top-right -->
-<div id="tooltip"></div>
-<div id="player" style="position:absolute;top:14px;right:14px;background:rgba(0,0,0,.82);
-  border-radius:11px;padding:8px 12px">
-  <div style="display:flex;align-items:center;gap:7px">
-    <button class="main" id="btn-play" style="width:76px;padding:5px 0;font-size:12px">&#9654; Start</button>
-    <button class="main" id="btn-reset" style="width:62px;padding:5px 0;font-size:12px;background:#333;color:#eee">&#8635; Reset</button>
-    <button class="main" id="btn-fill-temp" style="width:76px;padding:5px 0;font-size:11px;background:#1a3a1a;color:#6fcf97">&#10003; Fill Sort</button>
-    <div style="display:flex;flex-direction:column;gap:1px;min-width:100px">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa">
-        <span>Speed</span><span id="sv" style="color:#fff;font-weight:700">4.0x</span>
-      </div>
-      <input type="range" id="speed" min="0.5" max="20" step="0.5" value="4" style="width:100%;accent-color:#f0a500">
-    </div>
-    <div style="display:flex;gap:4px">
-      <button class="cam on" id="c-free" style="padding:4px 8px;font-size:10px">Persp</button>
-      <button class="cam" id="c-follow" style="padding:4px 8px;font-size:10px">Follow</button>
-      <button class="cam" id="c-top" style="padding:4px 8px;font-size:10px">Top</button>
-    </div>
-  </div>
-</div>
-
 <div id="ui">
   <h2>Settings</h2>
   <div class="sec" style="margin-top:0;border-top:none;padding-top:0">
@@ -106,7 +94,7 @@ button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;fo
   </div>
   <div class="sec">
     <div class="sec-title" style="color:#f0c060;font-weight:700">Items &amp; quantities</div>
-    <div id="item-list" style="max-height:170px;overflow-y:auto;overflow-x:hidden"></div>
+    <div id="item-list" style="max-height:120px;overflow-y:auto;overflow-x:hidden"></div>
     <button id="btn-add">+ Add item</button>
     <label id="btn-upload" style="width:100%;background:#1a1a3a;color:#7b9fff;border:1px solid #2d3a7a;
       border-radius:6px;padding:5px 0;font-size:12px;cursor:pointer;margin-top:4px;
@@ -128,33 +116,63 @@ button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;fo
     <span style="color:#888">+66-81-723-9680</span>
   </div>
 </div>
-
-<!-- Mouse control guide - positioned to right of settings panel via JS -->
-<div id="mouse-guide" style="position:absolute;background:rgba(0,0,0,.72);
-  border-radius:9px;padding:10px 14px;font-size:11px;color:#888;line-height:2;
-  pointer-events:none">
-  <div style="font-size:11px;font-weight:700;color:#aaa;margin-bottom:4px">&#128432; Controls</div>
-  <div><span style="color:#f0a500;font-weight:600">Left drag</span>&nbsp;&nbsp;Rotate view</div>
-  <div><span style="color:#f0a500;font-weight:600">Scroll</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Zoom in / out</div>
-  <div><span style="color:#f0a500;font-weight:600">Mid drag</span>&nbsp;&nbsp;Pan view</div>
-  <div><span style="color:#f0a500;font-weight:600">Shift+Scroll</span>&nbsp;Pan Z axis</div>
-  <div><span style="color:#f0a500;font-weight:600">Alt+Scroll</span>&nbsp;&nbsp;Pan X axis</div>
+</div><!-- /sidebar -->
+<div id="viewport">
+<!-- Player card top-right -->
+<div id="tooltip"></div>
+<div id="player" style="position:absolute;top:14px;right:14px;z-index:10;background:rgba(0,0,0,.82);
+  border-radius:11px;padding:8px 14px">
+  <div style="display:flex;align-items:center;gap:8px">
+    <!-- Playback -->
+    <button class="main" id="btn-play" style="width:80px;height:30px;font-size:12px">&#9654; Start</button>
+    <button class="main" id="btn-reset" style="width:68px;height:30px;font-size:12px">&#8635; Reset</button>
+    <button class="main" id="btn-fill-temp" style="width:110px;height:30px;font-size:11px">Sort Complete</button>
+    <!-- Divider -->
+    <div style="width:1px;height:30px;background:#444"></div>
+    <!-- Speed -->
+    <div style="display:flex;gap:3px">
+      <button id="sp-normal" onclick="setSpeed(1.5,'Normal')" style="width:68px;height:30px;font-size:10px;font-weight:700;border:none;border-radius:7px;background:#2a6aad;color:#fff;cursor:pointer">Normal</button>
+      <button id="sp-fast"   onclick="setSpeed(4,'Fast')"   style="width:68px;height:30px;font-size:10px;font-weight:700;border:none;border-radius:7px;background:#1a4a8a;color:#fff;cursor:pointer">Fast</button>
+      <button id="sp-super"  onclick="setSpeed(20,'Super')" style="width:68px;height:30px;font-size:10px;font-weight:700;border:none;border-radius:7px;background:#0d2d5c;color:#fff;cursor:pointer">Superfast</button>
+    </div>
+    <input type="hidden" id="speed" value="4">
+    <span id="sv" style="display:none">4.0x</span>
+    <!-- Divider -->
+    <div style="width:1px;height:30px;background:#444"></div>
+    <!-- Camera -->
+    <div style="display:flex;gap:3px">
+      <button class="cam on" id="c-free" style="width:68px;height:30px;padding:0;font-size:10px">Persp</button>
+      <button class="cam" id="c-follow" style="width:68px;height:30px;padding:0;font-size:10px">Follow</button>
+      <button class="cam" id="c-top" style="width:68px;height:30px;padding:0;font-size:10px">Top</button>
+    </div>
+  </div>
 </div>
-
-
+<!-- Mouse guide - horizontal, bottom of viewport -->
+<div id="mouse-guide" style="position:absolute;bottom:18px;left:14px;z-index:10;
+  background:rgba(0,0,0,.65);border-radius:8px;padding:6px 16px;
+  font-size:11px;color:#888;pointer-events:none;white-space:nowrap;
+  display:flex;align-items:center;gap:16px">
+  <span style="color:#aaa;font-weight:700">&#128432;</span>
+  <span><span style="color:#f0a500;font-weight:600">Left drag</span> Rotate</span>
+  <span><span style="color:#f0a500;font-weight:600">Scroll</span> Zoom</span>
+  <span><span style="color:#f0a500;font-weight:600">Mid drag</span> Pan</span>
+  <span><span style="color:#f0a500;font-weight:600">Shift+Scroll</span> Pan Z</span>
+  <span><span style="color:#f0a500;font-weight:600">Alt+Scroll</span> Pan X</span>
+</div>
 <div id="hud" style="display:none">
   <b id="loaded">0</b><span id="hud-tot"> / 100</span>
   <div id="status">Ready</div>
 </div>
 
-<div id="info-card" style="position:absolute;right:14px;
+<div id="info-card" style="position:absolute;right:14px;z-index:10;
   background:transparent;border-radius:10px;padding:12px 16px;width:320px;
   font-size:11px;color:#bbb;line-height:1.7;border:1px solid rgba(255,255,255,0.2)">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
     <div style="font-size:12px;font-weight:700;color:#f0a500">&#8505; About This Simulation</div>
-    <div style="display:flex;gap:4px">
+    <div style="display:flex;gap:4px;align-items:center">
       <button onclick="setLang('en')" id="lang-en" style="background:#f0a500;color:#1a1a2e;border:none;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">EN</button>
       <button onclick="setLang('th')" id="lang-th" style="background:transparent;color:#aaa;border:1px solid #555;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer">TH</button>
+      <button onclick="document.getElementById('info-card').style.display='none'" style="background:transparent;color:#888;border:1px solid #555;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:700;cursor:pointer;margin-left:2px">&#10005;</button>
     </div>
   </div>
   <div id="info-en">
@@ -171,17 +189,21 @@ button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;fo
     <span style="color:#999"><i>This tool is intended to assist in preliminary space planning and Workflow estimation only. It is necessary to balance between <b style="color:#bbb">space required</b> and <b style="color:#bbb">time required</b>, appropriate to the item types and quantities, before making operational decisions.</i></span>
   </div>
   <div id="info-th" style="display:none">
-    การแสดงผลและการจำลองนี้คำนวณจากตรรกะการปฏิบัติงานพื้นฐาน
-    <b style="color:#eee">เพื่อการอ้างอิงเท่านั้น</b> ลำดับการจัดเรียง การจัดเก็บชั่วคราว
-    และการเคลื่อนที่ของรถโฟล์คลิฟท์ เป็นการแสดงแทนที่เรียบง่ายของการปฏิบัติงานคลังสินค้าจริง<br><br>
-    การจำลองนี้เปรียบเทียบวิธีการจัดเก็บสองแบบเคียงกัน:<br><br>
-    <b style="color:#eee">📦 พื้นที่รับสินค้า</b> (ซ้าย) ใช้ <b style="color:#eee">การจัดเก็บแบบขับเข้าพร้อมช่องว่างระหว่างแถว</b>
-    ให้รถโฟล์คลิฟท์สามารถเข้าถึงและหยิบพาเลทได้โดยตรง — แต่ใช้พื้นที่ต่อพาเลทมากกว่า<br><br>
-    <b style="color:#eee">🗂 พื้นที่จัดเรียงและจัดเก็บ</b> (ขวา) ใช้ <b style="color:#eee">การวางซ้อนแบบชิดติดกันไม่มีช่องว่าง</b>
-    เพิ่มความหนาแน่นในการจัดเก็บสูงสุด โดยสินค้าแต่ละประเภทจะถูกจัดกลุ่มไว้ในแถวที่กำหนดตามจำนวน แต่วิธีนี้อาจใช้พื้นที่มากขึ้นหากมีสินค้าหลายประเภทที่มีจำนวนน้อย<br><br>
+    การจำลองการใช้พื้นที่คำนวณจากวิธีการปฏิบัติงานพื้นฐาน <b style="color:#eee">เพื่อการอ้างอิงเท่านั้น</b>
+    ลำดับการจัดเรียง การจัดเก็บชั่วคราว และการเคลื่อนที่ของรถโฟล์คลิฟท์
+    เป็นการแสดงการปฏิบัติงานของคลังสินค้าตามที่ได้จากการคำนวน
+    ซึ่งการปฏิบัติงานจริงอาจแตกต่างกันออกไปเพื่อประสิทธิภาพที่ดีกว่า<br><br>
+    การจำลองนี้เปรียบเทียบวิธีการจัดเก็บสองแบบเพื่อให้เห็นแนวทาง:<br><br>
+    <b style="color:#eee">📦 พื้นที่รับสินค้า</b> (ซ้าย) เป็นการจัดเก็บสินค้าแบบเว้นระยะให้รถฟอร์คลิฟท์สามารถขับเข้าไประหว่างแถวของสินค้า
+    เพื่อทำการหยิบสินค้าที่ต้องการได้โดยตรง — แต่ในกรณีทั่วไปใช้พื้นที่มากกว่าการจัดเก็บแบบชิดกัน<br><br>
+    <b style="color:#eee">🗂 พื้นที่จัดเรียงและจัดเก็บ</b> (ขวา) เป็นการวางสินค้าแบบชิดติดกันไม่มีช่องว่าง
+    เพิ่มความหนาแน่นในการจัดเก็บสูงสุด โดยสินค้าแต่ละประเภทจะถูกจัดกลุ่มไว้ในแถวที่กำหนดตามจำนวน
+    แต่วิธีนี้อาจใช้พื้นที่มากขึ้นหากมีสินค้าหลายประเภทที่มีจำนวนต่อรายการสินค้าน้อย<br><br>
     <b style="color:#eee">ลำดับการหยิบสินค้า:</b> รถโฟล์คลิฟท์จัดเรียงสินค้าทีละประเภท
     พาเลทที่กีดขวางจะถูกนำไปพักชั่วคราวก่อน จากนั้นจึงหยิบสินค้าเป้าหมายและนำไปวางในพื้นที่จัดเรียง<br><br>
-    <span style="color:#999"><i>เครื่องมือนี้มีวัตถุประสงค์เพื่อช่วยในการวางแผนพื้นที่เบื้องต้นและการประมาณการ Workflow เท่านั้น จำเป็นต้องชั่งน้ำหนักระหว่าง <b style="color:#bbb">พื้นที่ที่ต้องใช้</b> และ <b style="color:#bbb">เวลาที่ต้องใช้</b> ให้เหมาะสมกับรายการและจำนวนสินค้าก่อนตัดสินใจดำเนินการจริง</i></span>
+    <span style="color:#999"><i>เครื่องมือนี้มีวัตถุประสงค์เพื่อช่วยในการวางแผนพื้นที่เบื้องต้นและการประมาณการ Workflow เท่านั้น
+    จำเป็นต้องชั่งน้ำหนักระหว่าง <b style="color:#bbb">พื้นที่ที่ต้องใช้</b> และ <b style="color:#bbb">เวลาที่ต้องใช้</b>
+    ให้เหมาะสมกับรายการและจำนวนสินค้าก่อนตัดสินใจดำเนินการจริง</i></span>
   </div>
 </div>
 
@@ -217,13 +239,19 @@ button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;fo
 </script>
 <script>
 // ── Palette ──────────────────────────────────────────────────────────────────
-// 50-item palette (8 base colors cycling with brightness variation)
-var _bc=[0xc0392b,0x2980b9,0x27ae60,0xf39c12,0x8e44ad,0x16a085,0xe67e22,0x1abc9c,
-         0xe74c3c,0x3498db,0x2ecc71,0xf1c40f,0x9b59b6,0x1abc9c,0xe67e22,0x48c9b0,
-         0xa93226,0x1a5276,0x1e8449,0xd68910,0x6c3483,0x0e6655,0xba4a00,0x117a65];
-var _bh=['#c0392b','#2980b9','#27ae60','#f39c12','#8e44ad','#16a085','#e67e22','#1abc9c',
-         '#e74c3c','#3498db','#2ecc71','#f1c40f','#9b59b6','#1abc9c','#e67e22','#48c9b0',
-         '#a93226','#1a5276','#1e8449','#d68910','#6c3483','#0e6655','#ba4a00','#117a65'];
+// Realistic cardboard/carton color palette - shades and tones of brown
+var _bc=[
+  0xC8A96E,0xB8945A,0xD4B483,0xA07848,0xBE9D6A,  // mid browns
+  0xDCC090,0x966030,0xCAAB7A,0x8C5828,0xE0C898,  // light to dark
+  0xAA8850,0xC49458,0xD8BC84,0x946830,0xBC9060,  // warm browns
+  0xCC9960,0xA07040,0xD4AA70,0x8A5820,0xC8A050   // golden browns
+];
+var _bh=[
+  '#C8A96E','#B8945A','#D4B483','#A07848','#BE9D6A',
+  '#DCC090','#966030','#CAAB7A','#8C5828','#E0C898',
+  '#AA8850','#C49458','#D8BC84','#946830','#BC9060',
+  '#CC9960','#A07040','#D4AA70','#8A5820','#C8A050'
+];
 var ALL_COLORS=[],ALL_HEX=[];
 for(var _i=0;_i<50;_i++){ALL_COLORS.push(_bc[_i%_bc.length]);ALL_HEX.push(_bh[_i%_bh.length]);}
 
@@ -258,7 +286,7 @@ var storGrid=[],storItemType=[];
 var palletMap=new Map(); // mesh group -> {item, zone}
 var prepGrid=[];
 var playing=false,camMode='free';
-var orbitA={th:0.9,ph:0.55},orbitR=52,topR=38;
+var orbitA={th:-0.8,ph:1.0},orbitR=40,topR=38;
 var panX=0,panZ=0; // camera pan offset
 var oDrag=false,oLast={x:0,y:0};
 var prevT=null;
@@ -272,8 +300,8 @@ var tempGrid2=[];  // shared temp: [col] = stack of {mesh,itemIdx}
 
 // ── Item list UI ──────────────────────────────────────────────────────────────
 var itemRows=[
-  {name:'Item A',qty:20},{name:'Item B',qty:20},{name:'Item C',qty:20},
-  {name:'Item D',qty:20},{name:'Item E',qty:20}
+  {name:'Item 1',qty:20},{name:'Item 2',qty:20},{name:'Item 3',qty:20},
+  {name:'Item 4',qty:20},{name:'Item 5',qty:20}
 ];
 
 function renderItemList(){
@@ -289,6 +317,8 @@ function renderItemList(){
     var qi=document.createElement('input');qi.type='number';
     qi.value=row.qty;qi.min=0;qi.step=1;
     qi.addEventListener('input',function(){
+      row.qty=Math.max(0,parseInt(this.value)||0);scheduleRebuild();});
+    qi.addEventListener('change',function(){
       row.qty=Math.max(0,parseInt(this.value)||0);scheduleRebuild();});
     var rm=document.createElement('button');rm.className='item-rm';rm.textContent='×';
     rm.addEventListener('click',function(){
@@ -394,9 +424,10 @@ function init(){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-  document.body.appendChild(renderer.domElement);
+  var vp=document.getElementById('viewport');
+  vp.appendChild(renderer.domElement);
   resize();window.addEventListener('resize',resize);
-  camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,200);
+  camera=new THREE.PerspectiveCamera(50,vp.clientWidth/vp.clientHeight,0.1,200);
   scene.add(new THREE.AmbientLight(0xffffff,0.42));
   var sun=new THREE.DirectionalLight(0xfff2d0,1.1);
   sun.position.set(8,24,6);sun.castShadow=true;
@@ -424,22 +455,8 @@ function setLang(lang){
   document.getElementById('lang-th').style.border=lang==='th'?'none':'1px solid #555';
 }
 
-// Position mouse guide to right of settings panel
-(function(){
-  function posGuide(){
-    var ui=document.getElementById('ui');
-    var mg=document.getElementById('mouse-guide');
-    if(ui&&mg){
-      var r=ui.getBoundingClientRect();
-      mg.style.left=(r.right+10)+'px';
-      mg.style.top=r.bottom-mg.offsetHeight+'px';
-      if(parseInt(mg.style.top)<80) mg.style.top='80px';
-    }
-  }
-  window.addEventListener('load',posGuide);
-  window.addEventListener('resize',posGuide);
-  setTimeout(posGuide,150);
-})();
+// Mouse guide is fixed at bottom-left of viewport via CSS
+(function posGuide(){})();
 
 // Position info card below player
 (function(){
@@ -454,8 +471,9 @@ function setLang(lang){
 })();
 
 function resize(){
-  renderer.setSize(innerWidth,innerHeight);
-  if(camera){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+  var vp=document.getElementById('viewport');
+  renderer.setSize(vp.clientWidth,vp.clientHeight);
+  if(camera){camera.aspect=vp.clientWidth/vp.clientHeight;camera.updateProjectionMatrix();}
 }
 
 function buildScene(){
@@ -486,12 +504,26 @@ function clearScene(){
 }
 
 var rebuildTimer=null, isRebuilding=false;
+function minimizeSpace(){
+  // Recalculate cols and depth to minimize space based on current total qty
+  var total=0;
+  itemRows.forEach(function(r){total+=Math.max(0,r.qty||0);});
+  if(total<=0) return;
+  var curDepth=Math.max(3,parseInt(document.getElementById('inp-depth').value)||10);
+  var neededCols=Math.max(2,Math.ceil(total/curDepth));
+  // If neededCols changed, also recalc depth to fit exactly
+  var neededDepth=Math.max(3,Math.ceil(total/neededCols));
+  document.getElementById('inp-cols').value=neededCols;
+  document.getElementById('inp-depth').value=neededDepth;
+}
+
 function scheduleRebuild(){
   clearTimeout(rebuildTimer);
   rebuildTimer=setTimeout(function(){
     if(isRebuilding) return;
     isRebuilding=true;
     try{
+      minimizeSpace();
       computeDerived();
       if(!validateItems()){updateStats();isRebuilding=false;return;}
       doFullReset(true);
@@ -696,6 +728,8 @@ function buildPrepArea(){
 }
 function makePallet(cargoColor){
   var g=new THREE.Group();
+
+  // Pallet base
   var dm=new THREE.MeshLambertMaterial({color:0x9B7040});
   var sm=new THREE.MeshLambertMaterial({color:0x7A5828});
   var td=new THREE.Mesh(new THREE.BoxGeometry(PW,0.07,PL),dm);
@@ -706,53 +740,273 @@ function makePallet(cargoColor){
   }
   var bd=new THREE.Mesh(new THREE.BoxGeometry(PW,0.06,PL),dm);
   bd.position.y=0.03;g.add(bd);
-  var cargo=new THREE.Mesh(new THREE.BoxGeometry(PW*0.88,PH-0.15,PL*0.88),
-    new THREE.MeshLambertMaterial({color:cargoColor||0xaaaaaa}));
-  cargo.position.y=0.15+(PH-0.15)/2;cargo.castShadow=true;g.add(cargo);
-  var wrap=new THREE.Mesh(new THREE.BoxGeometry(PW*0.9,PH*0.32,PL*0.9),
-    new THREE.MeshLambertMaterial({color:0xd4caa0,transparent:true,opacity:0.22}));
-  wrap.position.y=0.15+PH*0.16;g.add(wrap);
+
+  // Single cargo block
+  var cH=PH-0.15;
+  var cargo=new THREE.Mesh(
+    new THREE.BoxGeometry(PW*0.88,cH,PL*0.88),
+    new THREE.MeshLambertMaterial({color:cargoColor||0xaaaaaa})
+  );
+  cargo.position.y=0.15+cH/2;
+  cargo.castShadow=true;cargo.receiveShadow=true;
+  g.add(cargo);
+
+  // Draw grid lines to simulate 2x2x3 carton stack
+  var cols=2, rows=2, layers=3;
+  var cW=PW*0.88, cD=PL*0.88;
+  var lineMat=new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:0.22});
+  var lineY=0.15; // base of cargo
+
+  // Vertical dividers along X (split columns)
+  for(var ci=1;ci<cols;ci++){
+    var x=-cW/2+ci*(cW/cols);
+    [[-cD/2,cD/2]].forEach(function(zr){
+      var pts=new Float32Array([x,lineY,zr[0], x,lineY+cH,zr[0], x,lineY+cH,zr[1], x,lineY,zr[1]]);
+      // front and back vertical lines
+      [[x,lineY,-cD/2, x,lineY+cH,-cD/2],[x,lineY,cD/2, x,lineY+cH,cD/2]].forEach(function(p){
+        var geo=new THREE.BufferGeometry();
+        geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(p),3));
+        g.add(new THREE.Line(geo,lineMat));
+      });
+      // face fill line
+      var geo2=new THREE.BufferGeometry();
+      geo2.setAttribute('position',new THREE.BufferAttribute(new Float32Array([
+        x,lineY,-cD/2, x,lineY,cD/2, x,lineY+cH,cD/2, x,lineY+cH,-cD/2
+      ]),3));
+      g.add(new THREE.Line(geo2,lineMat));
+    });
+  }
+
+  // Vertical dividers along Z (split rows)
+  for(var ri=1;ri<rows;ri++){
+    var z=-cD/2+ri*(cD/rows);
+    [[-cW/2,cW/2]].forEach(function(xr){
+      [[-cW/2,lineY,z,-cW/2,lineY+cH,z],[cW/2,lineY,z,cW/2,lineY+cH,z]].forEach(function(p){
+        var geo=new THREE.BufferGeometry();
+        geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(p),3));
+        g.add(new THREE.Line(geo,lineMat));
+      });
+      var geo2=new THREE.BufferGeometry();
+      geo2.setAttribute('position',new THREE.BufferAttribute(new Float32Array([
+        -cW/2,lineY,z, cW/2,lineY,z, cW/2,lineY+cH,z, -cW/2,lineY+cH,z
+      ]),3));
+      g.add(new THREE.Line(geo2,lineMat));
+    });
+  }
+
+  // Horizontal dividers (layers)
+  for(var li=1;li<layers;li++){
+    var y=lineY+li*(cH/layers);
+    var hPts=[
+      -cW/2,y,-cD/2, cW/2,y,-cD/2, cW/2,y,cD/2, -cW/2,y,cD/2, -cW/2,y,-cD/2
+    ];
+    var geo3=new THREE.BufferGeometry();
+    geo3.setAttribute('position',new THREE.BufferAttribute(new Float32Array(hPts),3));
+    g.add(new THREE.Line(geo3,lineMat));
+  }
+
   return g;
 }
 
+var FORKLIFT_IMG="data:image/png;base64,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";
 // ── Forklift ──────────────────────────────────────────────────────────────────
 function buildForklift(){
   if(forkliftGroup)scene.remove(forkliftGroup);
   forkliftGroup=new THREE.Group();
-  var Y=new THREE.MeshLambertMaterial({color:0xf0a500});
-  var D=new THREE.MeshLambertMaterial({color:0x181818});
-  var B=new THREE.MeshLambertMaterial({color:0x2266cc});
-  var GL=new THREE.MeshLambertMaterial({color:0xffffaa,emissive:0xffee66,emissiveIntensity:0.7});
-  function add(p,d,m,pos){var o=new THREE.Mesh(new THREE.BoxGeometry(d[0],d[1],d[2]),m);
-    o.position.set(pos[0],pos[1],pos[2]);o.castShadow=true;p.add(o);}
-  add(forkliftGroup,[1.1,1.05,2.2],Y,[0,0.70,0]);
-  add(forkliftGroup,[1.0,0.44,0.88],Y,[0,1.45,-0.66]);
-  add(forkliftGroup,[0.9,0.10,1.10],Y,[0,1.84,0.24]);
-  add(forkliftGroup,[0.88,0.54,0.05],B,[0,1.54,-0.22]);
-  add(forkliftGroup,[1.06,0.70,0.36],D,[0,0.50,-1.24]);
-  add(forkliftGroup,[0.28,0.14,0.06],GL,[0,0.95,1.16]);
-  add(forkliftGroup,[0.28,0.14,0.06],GL,[0,1.13,1.16]);
-  var wg=new THREE.CylinderGeometry(0.24,0.24,0.24,14);
-  [[0.56,0.22,0.86],[-0.56,0.22,0.86],[0.56,0.22,-0.86],[-0.56,0.22,-0.86]].forEach(function(wp){
-    var w=new THREE.Mesh(wg,D);w.rotation.z=Math.PI/2;
-    w.position.set(wp[0],wp[1],wp[2]);forkliftGroup.add(w);});
-  mastGroup=new THREE.Group();mastGroup.position.set(0,0,1.1);
-  var mg=new THREE.BoxGeometry(0.09,2.9,0.09);
-  var mL=new THREE.Mesh(mg,D);mL.position.set(-0.39,1.45,0);mastGroup.add(mL);
-  var mR=new THREE.Mesh(mg,D);mR.position.set(0.39,1.45,0);mastGroup.add(mR);
-  add(mastGroup,[0.86,0.09,0.09],D,[0,2.9,0]);
+
+  var Y =new THREE.MeshLambertMaterial({color:0xd45f00}); // dark orange main
+  var YD=new THREE.MeshLambertMaterial({color:0xa84000}); // darker orange shadow
+  var YL=new THREE.MeshLambertMaterial({color:0xe87020}); // lighter dark orange highlight
+  var D =new THREE.MeshLambertMaterial({color:0x1a1a1a});
+  var GR=new THREE.MeshLambertMaterial({color:0x2e2e2e});
+  var G2=new THREE.MeshLambertMaterial({color:0x444444});
+  var BK=new THREE.MeshLambertMaterial({color:0x0d0d0d});
+  var GL=new THREE.MeshLambertMaterial({color:0xffffcc,emissive:0xffee44,emissiveIntensity:1.0});
+  var RD=new THREE.MeshLambertMaterial({color:0xff2200,emissive:0x880000,emissiveIntensity:0.5});
+  var CH=new THREE.MeshLambertMaterial({color:0x888888});
+
+  function box(p,w,h,d,mat,x,y,z){
+    var o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+    o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;p.add(o);return o;
+  }
+
+  // ── Body ─────────────────────────────────────────────────────────────────
+  box(forkliftGroup,1.10,0.80,1.70,Y,   0,0.52, 0.08);
+  box(forkliftGroup,1.10,0.10,1.70,YL,  0,0.93, 0.08);
+  box(forkliftGroup,1.10,0.08,1.70,YD,  0,0.44, 0.08);
+  box(forkliftGroup,1.12,0.82,0.10,YD,  0,0.52,-0.77);
+  box(forkliftGroup,0.10,0.80,1.70,YD,  0.55,0.52, 0.08);
+  box(forkliftGroup,0.10,0.80,1.70,YD, -0.55,0.52, 0.08);
+
+  // ── Counterweight ────────────────────────────────────────────────────────
+  box(forkliftGroup,1.10,0.90,0.60,YD,  0,0.45,-1.05);
+  box(forkliftGroup,1.10,0.12,0.60,BK,  0,0.02,-1.05);
+  box(forkliftGroup,1.10,0.10,0.60,GR,  0,0.90,-1.05);
+
+  // ── Hood / engine cover ──────────────────────────────────────────────────
+  box(forkliftGroup,1.02,0.14,1.00,YD,  0,1.02, 0.32);
+  box(forkliftGroup,1.02,0.06,0.08,D,   0,0.96, 0.82);
+  box(forkliftGroup,0.80,0.05,0.90,GR,  0,1.10, 0.28);
+  for(var gi=0;gi<3;gi++){
+    box(forkliftGroup,0.76,0.03,0.04,BK, 0,1.11,0.05+gi*0.18);
+  }
+
+  // ── Operator area ────────────────────────────────────────────────────────
+  box(forkliftGroup,0.84,0.58,0.10,GR,  0,0.74,-0.42);
+  box(forkliftGroup,0.76,0.06,0.50,GR,  0,0.52,-0.28);
+  box(forkliftGroup,0.76,0.08,0.50,G2,  0,0.58,-0.28);
+  box(forkliftGroup,0.06,0.40,0.06,GR,  0,0.78, 0.42);
+  box(forkliftGroup,0.28,0.04,0.04,GR,  0,0.97, 0.42);
+
+  // ── Overhead guard canopy (complete with sloped front) ────────────────────
+  // Roof panel - full coverage
+  box(forkliftGroup,1.16,0.06,1.20,D,   0,2.06, 0.08);
+  // Roof top highlight
+  box(forkliftGroup,1.16,0.03,1.20,GR,  0,2.10, 0.08);
+  // Sloped front visor (angled down toward mast)
+  var visorGeo=new THREE.BoxGeometry(1.14,0.05,0.45);
+  var visor=new THREE.Mesh(visorGeo,D);
+  visor.rotation.x=Math.PI*0.18; // slope forward ~32 degrees
+  visor.position.set(0,1.94,0.72);
+  visor.castShadow=true;forkliftGroup.add(visor);
+  // Rear visor (slight slope back)
+  var visorB=new THREE.Mesh(new THREE.BoxGeometry(1.14,0.05,0.30),D);
+  visorB.rotation.x=-Math.PI*0.10;
+  visorB.position.set(0,1.98,-0.56);
+  forkliftGroup.add(visorB);
+
+  // 4 pillars - front taller to support sloped front
+  box(forkliftGroup,0.08,1.18,0.08,D,  0.50,1.48, 0.66);
+  box(forkliftGroup,0.08,1.18,0.08,D, -0.50,1.48, 0.66);
+  // Rear pillars
+  box(forkliftGroup,0.08,1.08,0.08,D,  0.50,1.52,-0.50);
+  box(forkliftGroup,0.08,1.08,0.08,D, -0.50,1.52,-0.50);
+  // Pillar top highlight
+  box(forkliftGroup,0.06,0.12,0.06,GR,  0.50,2.04, 0.66);
+  box(forkliftGroup,0.06,0.12,0.06,GR, -0.50,2.04, 0.66);
+  box(forkliftGroup,0.06,0.10,0.06,GR,  0.50,2.04,-0.50);
+  box(forkliftGroup,0.06,0.10,0.06,GR, -0.50,2.04,-0.50);
+  // Cross bars connecting pillars
+  box(forkliftGroup,1.08,0.06,0.06,D,   0,1.96, 0.66); // front bar
+  box(forkliftGroup,1.08,0.06,0.06,D,   0,1.98,-0.50); // rear bar
+  box(forkliftGroup,0.06,0.06,1.18,D,   0.50,2.02,0.08); // side bar R
+  box(forkliftGroup,0.06,0.06,1.18,D,  -0.50,2.02,0.08); // side bar L
+
+  // ── Lights ────────────────────────────────────────────────────────────────
+  box(forkliftGroup,0.22,0.13,0.05,GL,  0.30,0.85, 1.04);
+  box(forkliftGroup,0.22,0.13,0.05,GL, -0.30,0.85, 1.04);
+  box(forkliftGroup,0.10,0.06,0.04,RD,  0.30,0.62,-1.07);
+  box(forkliftGroup,0.10,0.06,0.04,RD, -0.30,0.62,-1.07);
+
+  // ── Wheels ────────────────────────────────────────────────────────────────
+  var wxz=[[0.60,0.28,0.78],[-0.60,0.28,0.78],[0.60,0.28,-0.78],[-0.60,0.28,-0.78]];
+  wxz.forEach(function(wp){
+    var outer=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.28,0.20,20),BK);
+    outer.rotation.z=Math.PI/2;outer.position.set(wp[0],wp[1],wp[2]);
+    outer.castShadow=true;forkliftGroup.add(outer);
+    var tread=new THREE.Mesh(new THREE.TorusGeometry(0.28,0.03,8,20),GR);
+    tread.rotation.y=Math.PI/2;tread.position.set(wp[0],wp[1],wp[2]);
+    forkliftGroup.add(tread);
+    var rim=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.22,12),CH);
+    rim.rotation.z=Math.PI/2;rim.position.set(wp[0],wp[1],wp[2]);
+    forkliftGroup.add(rim);
+    var hub=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.24,8),D);
+    hub.rotation.z=Math.PI/2;hub.position.set(wp[0],wp[1],wp[2]);
+    forkliftGroup.add(hub);
+  });
+  box(forkliftGroup,1.24,0.08,0.08,GR, 0,0.28, 0.78);
+  box(forkliftGroup,1.24,0.08,0.08,GR, 0,0.28,-0.78);
+
+  // ── Mast (reduced height to match real forklift proportion) ───────────────
+  mastGroup=new THREE.Group();mastGroup.position.set(0,0,1.10);
+  // Outer channels
+  var oL=new THREE.Mesh(new THREE.BoxGeometry(0.10,2.60,0.12),D);
+  oL.position.set(-0.40,1.30,0);mastGroup.add(oL);
+  var oR=new THREE.Mesh(new THREE.BoxGeometry(0.10,2.60,0.12),D);
+  oR.position.set( 0.40,1.30,0);mastGroup.add(oR);
+  // Inner channels
+  var iL=new THREE.Mesh(new THREE.BoxGeometry(0.07,2.10,0.08),GR);
+  iL.position.set(-0.26,1.15,0.06);mastGroup.add(iL);
+  var iR=new THREE.Mesh(new THREE.BoxGeometry(0.07,2.10,0.08),GR);
+  iR.position.set( 0.26,1.15,0.06);mastGroup.add(iR);
+  // Cross bars
+  box(mastGroup,0.88,0.08,0.10,D,  0,2.58,0);
+  box(mastGroup,0.88,0.08,0.10,GR, 0,0.50,0);
+  box(mastGroup,0.88,0.08,0.10,GR, 0,1.40,0);
+
+  // ── Fork carriage ─────────────────────────────────────────────────────────
   forkGroup=new THREE.Group();
   var fkLen=Math.max(0.8,PL*0.90);
-  var fg=new THREE.BoxGeometry(0.09,0.07,fkLen);
-  var fL=new THREE.Mesh(fg,D);fL.position.set(-0.28,0,fkLen/2);forkGroup.add(fL);
-  var fR=new THREE.Mesh(fg,D);fR.position.set(0.28,0,fkLen/2);forkGroup.add(fR);
-  add(forkGroup,[0.74,0.52,0.07],D,[0,0.26,0]);
+  box(forkGroup,0.82,0.64,0.08,GR, 0,0.32,0.04);
+  box(forkGroup,0.82,0.04,0.08,D,  0,0.64,0.04);
+  box(forkGroup,0.82,0.04,0.08,D,  0,0.00,0.04);
+  var fkMat=new THREE.MeshLambertMaterial({color:0x222222});
+  var fL=new THREE.Mesh(new THREE.BoxGeometry(0.10,0.07,fkLen),fkMat);
+  fL.position.set(-0.28,0,fkLen/2);forkGroup.add(fL);
+  var fR=new THREE.Mesh(new THREE.BoxGeometry(0.10,0.07,fkLen),fkMat);
+  fR.position.set( 0.28,0,fkLen/2);forkGroup.add(fR);
+  box(forkGroup,0.10,0.03,0.18,fkMat,-0.28,0.02,fkLen-0.06);
+  box(forkGroup,0.10,0.03,0.18,fkMat, 0.28,0.02,fkLen-0.06);
+
+  // ── Driver ───────────────────────────────────────────────────────────────
+  var SK=new THREE.MeshLambertMaterial({color:0xf0c090}); // skin
+  var JS=new THREE.MeshLambertMaterial({color:0x1a3a5c}); // jumpsuit blue
+  var JD=new THREE.MeshLambertMaterial({color:0x122840}); // jumpsuit dark
+  var HT=new THREE.MeshLambertMaterial({color:0xd45f00}); // hard hat dark orange
+  var VT=new THREE.MeshLambertMaterial({color:0xf0c000}); // hi-vis vest yellow
+
+  var driver=new THREE.Group();
+
+  // Legs (sitting - horizontal)
+  box(driver,0.18,0.16,0.44,JS,  0.14,0.62, 0.08); // right thigh
+  box(driver,0.18,0.16,0.44,JS, -0.14,0.62, 0.08); // left thigh
+  box(driver,0.16,0.38,0.16,JS,  0.14,0.26, 0.30); // right shin (angled down)
+  box(driver,0.16,0.38,0.16,JS, -0.14,0.26, 0.30); // left shin
+  // Boots
+  box(driver,0.18,0.10,0.22,JD,  0.14,0.08, 0.24);
+  box(driver,0.18,0.10,0.22,JD, -0.14,0.08, 0.24);
+
+  // Torso
+  box(driver,0.44,0.54,0.28,JS,  0,0.96,-0.18);
+  // Hi-vis vest stripes
+  box(driver,0.46,0.06,0.30,VT,  0,1.06,-0.18);
+  box(driver,0.46,0.06,0.30,VT,  0,0.84,-0.18);
+  // Chest pocket
+  box(driver,0.10,0.08,0.06,JD,  0.14,0.98,-0.33);
+
+  // Arms
+  box(driver,0.14,0.14,0.36,JS,  0.30,0.90,-0.02); // upper arm R
+  box(driver,0.14,0.14,0.36,JS, -0.30,0.90,-0.02); // upper arm L
+  box(driver,0.12,0.12,0.28,JS,  0.30,0.90, 0.30); // forearm R (toward wheel)
+  box(driver,0.12,0.12,0.28,JS, -0.30,0.90, 0.30); // forearm L
+  // Hands on steering
+  box(driver,0.10,0.10,0.10,SK,  0.18,0.92, 0.46);
+  box(driver,0.10,0.10,0.10,SK, -0.18,0.92, 0.46);
+
+  // Neck
+  box(driver,0.14,0.12,0.14,SK,  0,1.26, 0.10);
+
+  // Head
+  box(driver,0.28,0.26,0.26,SK,  0,1.46, 0.10);
+  // Face details
+  box(driver,0.06,0.04,0.04,JD,  0.07,1.44, 0.24); // eye R
+  box(driver,0.06,0.04,0.04,JD, -0.07,1.44, 0.24); // eye L
+  box(driver,0.08,0.03,0.04,SK,  0,1.38, 0.24);     // mouth
+
+  // Hard hat
+  box(driver,0.34,0.08,0.32,HT,  0,1.60, 0.10); // brim
+  box(driver,0.30,0.12,0.28,HT,  0,1.68, 0.10); // dome
+  // Hard hat strap
+  box(driver,0.30,0.03,0.04,JD,  0,1.54, 0.10);
+
+  driver.position.set(0,0,0);
+  forkliftGroup.add(driver);
+
   forkGroup.position.y=FORK_LOW;mastGroup.add(forkGroup);
   forkliftGroup.add(mastGroup);
   forkliftGroup.position.set(fk.x,0,fk.z);
   forkliftGroup.rotation.y=fk.angle;scene.add(forkliftGroup);
 }
-
 // ── Measurement annotation ────────────────────────────────────────────────────
 // ── Sort state ────────────────────────────────────────────────────────────────
 function initSortState(){
@@ -1005,7 +1259,7 @@ function updateCam(){
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 function setupInput(){
-  var el=renderer.domElement;
+  var el=document.getElementById('viewport');
   // ── Tooltip raycaster ────────────────────────────────────────────────────
   var raycaster=new THREE.Raycaster();
   var mouse=new THREE.Vector2();
@@ -1094,6 +1348,10 @@ function setupInput(){
 // ── Reset ─────────────────────────────────────────────────────────────────────
 function doFullReset(keepScene){
   panX=0;panZ=0;
+  orbitA.th=-0.8;orbitA.ph=1.0;orbitR=40;
+  camMode='free';
+  document.querySelectorAll('.cam').forEach(function(b){b.classList.remove('on');});
+  document.getElementById('c-free').classList.add('on');
   playing=false;wq=[];wHead=null;wPosArrived=false;currentRef=null;
   if(fk.carrying){forkGroup.remove(fk.carrying);fk.carrying=null;}
   if(typeof tempZone!=='undefined')
@@ -1214,6 +1472,21 @@ function handleFileUpload(file){
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
+function setSpeed(val,label){
+  document.getElementById('speed').value=val;
+  document.getElementById('sv').textContent=val+'x';
+  var cfg={
+    'Normal':{id:'sp-normal',active:'#2a6aad',inactive:'#1a2a3a'},
+    'Fast':  {id:'sp-fast',  active:'#1a4a8a',inactive:'#1a2a3a'},
+    'Super': {id:'sp-super', active:'#0d2d5c',inactive:'#1a2a3a'}
+  };
+  Object.keys(cfg).forEach(function(k){
+    var el=document.getElementById(cfg[k].id);
+    var isActive=(k===label);
+    el.style.background=isActive?cfg[k].active:cfg[k].inactive;
+    el.style.color=isActive?'#fff':'#666';
+  });
+}
 document.getElementById('speed').addEventListener('input',function(e){
   document.getElementById('sv').textContent=parseFloat(e.target.value).toFixed(1)+'x';
 });
@@ -1221,7 +1494,7 @@ document.getElementById('btn-play').addEventListener('click',function(){
   var total=0;items.forEach(function(it){total+=it.qty;});
   if(loadedCount>=total)return;
   playing=!playing;
-  document.getElementById('btn-play').innerHTML=playing?'&#9646;&#9646; Pause':'&#9654; Resume';
+  document.getElementById('btn-play').innerHTML=playing?'⏸ Pause':'▶ Resume';
   if(playing&&!wHead)planPick();
 });
 document.getElementById('btn-reset').addEventListener('click',function(){doFullReset(false);});
@@ -1244,6 +1517,14 @@ document.getElementById('file-input').addEventListener('change',function(e){
 function scheduleCapacityChange(){
   clearTimeout(rebuildTimer);
   rebuildTimer=setTimeout(function(){
+    var newDepth=Math.max(3,parseInt(document.getElementById('inp-depth').value)||10);
+    // Auto-adjust cols to minimum needed for this depth
+    var total=0;
+    itemRows.forEach(function(r){total+=Math.max(0,r.qty||0);});
+    if(total>0){
+      var neededCols=Math.max(2,Math.ceil(total/newDepth));
+      document.getElementById('inp-cols').value=neededCols;
+    }
     computeDerived();
     if(!validateItems()){updateStats();return;}
     doFullReset(false);
@@ -1251,9 +1532,29 @@ function scheduleCapacityChange(){
   },1200);
 }
 document.getElementById('inp-depth').addEventListener('input',scheduleCapacityChange);
-document.getElementById('inp-cols').addEventListener('input',scheduleRebuild);
-
-// Set developer email via JS to prevent Cloudflare interception
+document.getElementById('inp-depth').addEventListener('change',scheduleCapacityChange);
+document.getElementById('inp-cols').addEventListener('input',function(){
+  clearTimeout(rebuildTimer);
+  rebuildTimer=setTimeout(function(){
+    // Read new user cols
+    var userCols=Math.max(2,parseInt(document.getElementById('inp-cols').value)||2);
+    // Calculate total qty
+    var total=0;
+    itemRows.forEach(function(r){total+=Math.max(0,r.qty||0);});
+    if(total>0){
+      // Auto-adjust depth to fit all pallets in the new column count
+      var newDepth=Math.max(3,Math.ceil(total/userCols));
+      document.getElementById('inp-depth').value=newDepth;
+    }
+    computeDerived();
+    if(!validateItems()){updateStats();return;}
+    doFullReset(false);
+    updateStats();
+  },1200);
+});
+document.getElementById('inp-cols').addEventListener('change',function(){
+  document.getElementById('inp-cols').dispatchEvent(new Event('input'));
+});
 (function(){
   var u='komsan.kongsuwan',d='gmail.com';
   var el=document.getElementById('dev-email');
@@ -1261,7 +1562,9 @@ document.getElementById('inp-cols').addEventListener('input',scheduleRebuild);
 })();
 
 renderItemList();
+setSpeed(4,'Fast');
 init();
 </script>
+</div><!-- /viewport -->
 </body>
 </html>
