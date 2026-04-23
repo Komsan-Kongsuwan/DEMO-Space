@@ -33,6 +33,15 @@ button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;fo
 #hud b{color:#f0a500;font-size:20px;display:block;line-height:1.2}
 #stats{position:absolute;bottom:14px;right:14px;z-index:10;display:flex;gap:9px;flex-wrap:wrap;
   justify-content:flex-end;max-width:600px}
+#timer-card{position:absolute;top:14px;left:14px;z-index:10;
+  background:rgba(0,0,0,.82);border-radius:10px;padding:10px 16px;font-size:12px;color:#eee;
+  min-width:220px;border-top:2px solid #f0a500}
+#timer-card h3{font-size:11px;font-weight:700;color:#f0a500;margin-bottom:8px;letter-spacing:1px}
+.trow{display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px}
+.trow label{color:#aaa}.trow span{color:#fff;font-weight:700}
+.ttot{display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;
+  border-top:1px solid #333;font-size:13px}
+.ttot label{color:#f0a500;font-weight:600}.ttot span{color:#fff;font-weight:700;font-size:15px}
 .scard{background:rgba(0,0,0,.80);border-radius:10px;padding:10px 14px;font-size:12px;
   color:#eee;min-width:128px}
 .scard h3{font-size:10px;font-weight:700;color:#f0a500;margin-bottom:6px;
@@ -107,6 +116,12 @@ button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;fo
     </div>
     <div id="val-err"></div>
     <div id="val-tot"></div>
+  </div>
+  <div class="sec">
+    <div class="sec-title" style="color:#f0c060;font-weight:700">Operation Time Setup</div>
+    <div class="inp-row"><label>Sec per pick/drop</label>
+      <input type="number" id="t-pick" value="15" min="1" max="300" step="1" style="width:60px"></div>
+    <div class="inp-row"><label>Travel speed</label><span style="color:#f0a500;font-weight:700">8 km/h (fixed)</span></div>
   </div>
   <div style="border-top:1px solid #333;margin-top:12px;padding-top:10px;
     text-align:center;font-size:11px;color:#666;line-height:1.8">
@@ -207,6 +222,16 @@ button.main{flex:1;padding:7px 0;border:none;border-radius:7px;font-size:13px;fo
   </div>
 </div>
 
+<div id="timer-card">
+  <h3>⏱ OPERATION TIMER</h3>
+  <div class="trow"><label>Pallets handled</label><span id="tc-pallets">0</span></div>
+  <div class="trow"><label>Pick/Drop ops</label><span id="tc-ops">0</span></div>
+  <div class="trow"><label>Distance travelled</label><span id="tc-dist">0.0 m</span></div>
+  <div class="trow"><label>Pick/Drop time</label><span id="tc-picktime">00:00:00</span></div>
+  <div class="trow"><label>Travel time</label><span id="tc-travtime">00:00:00</span></div>
+  <div class="ttot"><label>Total Est. Time</label><span id="tc-total">00:00:00</span></div>
+</div>
+
 <div id="stats">
   <div class="scard">
     <h3>Receiving</h3>
@@ -272,8 +297,8 @@ function prepX(d){return LANE_HALF+d*DS+DS/2;}
 function prepColZ(c){return Z0+c*PREP_CS;}
 // Single shared temp zone: COLS cols × DEPTHS deep, placed after sorting in Z
 function tempColZ(col){ return TEMP_START_Z + col*CS; }  // one shared area
-function tempX(d){ return LANE_HALF + d*CS + CS/2; }
-function tempEnterX(d){ return tempX(d) - EFF_REACH; }
+function tempX(d){ return LANE_HALF + d*DS + DS/2; }
+function tempEnterX(d){ return tempX(d) - EFF_REACH; }  // enter from lane side
 // Legacy alias kept for compatibility
 function tempZoneColZ(idx,col){ return tempColZ(col); }
 
@@ -286,6 +311,8 @@ var storGrid=[],storItemType=[];
 var palletMap=new Map(); // mesh group -> {item, zone}
 var prepGrid=[];
 var playing=false,camMode='free';
+// ── Operation timer ───────────────────────────────────────────────────────────
+var opPallets=0, opOps=0, opDist=0;
 var orbitA={th:-0.8,ph:1.0},orbitR=40,topR=38;
 var panX=0,panZ=0; // camera pan offset
 var oDrag=false,oLast={x:0,y:0};
@@ -352,10 +379,10 @@ function computeDerived(){
   COLS=Math.max(userCols, neededCols);
   // Always show the effective COLS in the field so it matches the visualization
   document.getElementById('inp-cols').value=COLS;
-  CS=Math.max(1.5,PW+0.30);
-  DS=PL; PREP_CS=PW;
+  CS=Math.max(1.5,PW+0.30);  // column spacing = pallet WIDTH + clearance (PW faces aisle)
+  DS=PL; PREP_CS=PW;          // depth spacing = pallet LENGTH; sort col = pallet width
   FORK_HIGH=Math.max(0.72,PH*0.48);
-  FORK_REACH=PL*0.84;
+  FORK_REACH=PL*0.84;          // fork penetrates pallet length (depth direction)
   EFF_REACH=FORK_REACH*0.9+1.1; // mast offset (1.1) + fork arm (FORK_REACH*0.9)
 
   // Build items from UI rows
@@ -393,15 +420,14 @@ function validateItems(){
 }
 
 function updateStats(){
-  // Use exact same formulas as floor dimension lines (includes 0.3m border padding)
-  var zMin=Z0-CS/2-0.3, zMax=colZ(COLS-1)+CS/2+0.3;
-  var xStorL=storX(DEPTHS-1)-DS/2-0.3, xStorR=-LANE_HALF;
-  var rW=zMax-zMin, rL=xStorR-xStorL;
+  // Theoretical exact dimensions: no border padding, pure pallet footprint
+  // Receiving: width = CS × COLS, length = DS × DEPTHS
+  var rW = CS * COLS;          // total width = column spacing × number of columns
+  var rL = DS * DEPTHS;        // total length = depth spacing × depth count
 
-  var szMin=prepColZ(0)-PREP_CS/2-0.3;
-  var szMax=prepColZ(PREP_COLS-1)+PREP_CS/2+0.3;
-  var xPrepL=LANE_HALF, xPrepR=prepX(DEPTHS-1)+DS/2+0.3;
-  var sW=szMax-szMin, sL=xPrepR-xPrepL;
+  // Sorting: width = PREP_CS × PREP_COLS, length = DS × DEPTHS
+  var sW = PREP_CS * PREP_COLS;
+  var sL = DS * DEPTHS;
 
   document.getElementById('r-w').textContent=rW.toFixed(1)+' m';
   document.getElementById('r-l').textContent=rL.toFixed(1)+' m';
@@ -534,15 +560,17 @@ function scheduleRebuild(){
 }
 // ── Floor ─────────────────────────────────────────────────────────────────────
 function buildFloor(){
-  // Compute full extents of all areas to center grid
-  var zMin=Z0-CS/2-0.3, zMax=colZ(COLS-1)+CS/2+0.3;
-  var xStorL=storX(DEPTHS-1)-DS/2-0.3, xStorR=-LANE_HALF;
-  var xPrepL=LANE_HALF;
-  var xPrepR=(PREP_COLS>0)?prepX(DEPTHS-1)+DS/2+0.3:xPrepL;
+  // Exact theoretical dimensions - no border padding, pure pallet footprint
+  // Receiving: cols along Z, depth along X
+  var zMin=Z0-CS/2,            zMax=Z0+(COLS-0.5)*CS;      // exact col extents
+  var xStorR=-LANE_HALF,       xStorL=xStorR-DS*DEPTHS;    // exact depth extents
+  var xPrepL=LANE_HALF,        xPrepR=xPrepL+DS*DEPTHS;    // sorting depth extents
+  var szMin=Z0-PREP_CS/2,      szMax=Z0+(PREP_COLS-0.5)*PREP_CS; // sorting col extents
   // Temp zone right edge
-  var xTempR=tempX(DEPTHS-1)+DS/2+0.3;
-  var szMin=(PREP_COLS>0)?prepColZ(0)-PREP_CS/2-0.3:zMin;
-  var szMax=(PREP_COLS>0)?prepColZ(PREP_COLS-1)+PREP_CS/2+0.3:zMax;
+  var xTempR=(items.length>0)?tempX(DEPTHS-1)+DS/2:xPrepR;
+  var tzMax=(items.length>0)?tempColZ(COLS-1)+CS/2:szMax;
+  var szMin=(PREP_COLS>0)?Z0-PREP_CS/2:zMin;
+  var szMax=(PREP_COLS>0)?Z0+(PREP_COLS-0.5)*PREP_CS:zMax;
   var tzMax=(items.length>0)?(tempColZ(COLS-1)+CS/2+0.3):szMax;
 
   // Center of all areas combined
@@ -576,34 +604,28 @@ function buildFloor(){
 
   // Sorting floor
   if(PREP_COLS>0){
-    var xPrepR=prepX(DEPTHS-1)+DS/2+0.3;
     var xPCtr=(xPrepL+xPrepR)/2;
-    var szMin=prepColZ(0)-PREP_CS/2-0.3;
-    var szMax=prepColZ(PREP_COLS-1)+PREP_CS/2+0.3;
-    zonFloor(0x263040,xPCtr,(szMin+szMax)/2,xPrepR-xPrepL,szMax-szMin);
+    var szMin2=Z0-PREP_CS/2;
+    var szMax2=Z0+(PREP_COLS-0.5)*PREP_CS;
+    zonFloor(0x263040,xPCtr,(szMin2+szMax2)/2,xPrepR-xPrepL,szMax2-szMin2);
     var ym=new THREE.MeshBasicMaterial({color:0xf0a500});
-    hLine(ym,xPrepL,xPrepR,szMin);hLine(ym,xPrepL,xPrepR,szMax);
-    vLine(ym,xPrepL,szMin,szMax);vLine(ym,xPrepR,szMin,szMax);
-    addFloorLabel('SORTING &\nSTORAGE',xPCtr,(szMin+szMax)/2,'#56b4d3',4.5);
+    hLine(ym,xPrepL,xPrepR,szMin2);hLine(ym,xPrepL,xPrepR,szMax2);
+    vLine(ym,xPrepL,szMin2,szMax2);vLine(ym,xPrepR,szMin2,szMax2);
+    addFloorLabel('SORTING &\nSTORAGE',xPCtr,(szMin2+szMax2)/2,'#56b4d3',4.5);
 
     // Sorting column numbers along lane edge, row numbers along left edge
     for(var sc=0;sc<PREP_COLS;sc++)
       addSmallLabel('C'+(sc+1), xPrepL-0.6, prepColZ(sc), '#aabbff');
     for(var sd=0;sd<DEPTHS;sd++)
-      addSmallLabel('R'+(sd+1), prepX(sd), szMin-0.7, '#aabbff');
+      addSmallLabel('R'+(sd+1), prepX(sd), szMin2-0.7, '#aabbff');
 
-    floorDimZ(xPrepR+1.0,szMin,szMax,(szMax-szMin).toFixed(1)+' m','right');
-    floorDimX(xPrepL,xPrepR,szMin-1.0,(xPrepR-xPrepL).toFixed(1)+' m');
-
-    // Temp area - clean floor, no decoration
+    floorDimZ(xPrepR+1.0,szMin2,szMax2,(szMax2-szMin2).toFixed(1)+' m','right');
+    floorDimX(xPrepL,xPrepR,szMin2-1.0,(xPrepR-xPrepL).toFixed(1)+' m');
   }
 
   var ym2=new THREE.MeshBasicMaterial({color:0xf0a500});
   hLine(ym2,xStorL,xStorR,zMin);hLine(ym2,xStorL,xStorR,zMax);
   vLine(ym2,xStorL,zMin,zMax);vLine(ym2,xStorR,zMin,zMax);
-
-  var wm=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.18});
-  for(var z=zMin;z<zMax;z+=1.2)hLine(wm,-0.05,0.05,z+0.5);
 
   floorDimZ(xStorL-1.0,zMin,zMax,(zMax-zMin).toFixed(1)+' m','left');
   floorDimX(xStorL,xStorR,zMin-1.0,(xStorR-xStorL).toFixed(1)+' m');
@@ -732,19 +754,19 @@ function makePallet(cargoColor){
   // Pallet base
   var dm=new THREE.MeshLambertMaterial({color:0x9B7040});
   var sm=new THREE.MeshLambertMaterial({color:0x7A5828});
-  var td=new THREE.Mesh(new THREE.BoxGeometry(PW,0.07,PL),dm);
+  var td=new THREE.Mesh(new THREE.BoxGeometry(PL,0.07,PW),dm);
   td.position.y=0.115;td.castShadow=true;td.receiveShadow=true;g.add(td);
   for(var i=0;i<3;i++){
-    var s=new THREE.Mesh(new THREE.BoxGeometry(PW,0.09,0.09),sm);
-    s.position.set(0,0.045,-PL/2+i*(PL/2));g.add(s);
+    var s=new THREE.Mesh(new THREE.BoxGeometry(PL,0.09,0.09),sm);
+    s.position.set(0,0.045,-PW/2+i*(PW/2));g.add(s);
   }
-  var bd=new THREE.Mesh(new THREE.BoxGeometry(PW,0.06,PL),dm);
+  var bd=new THREE.Mesh(new THREE.BoxGeometry(PL,0.06,PW),dm);
   bd.position.y=0.03;g.add(bd);
 
   // Single cargo block
   var cH=PH-0.15;
   var cargo=new THREE.Mesh(
-    new THREE.BoxGeometry(PW*0.88,cH,PL*0.88),
+    new THREE.BoxGeometry(PL*0.88,cH,PW*0.88),
     new THREE.MeshLambertMaterial({color:cargoColor||0xaaaaaa})
   );
   cargo.position.y=0.15+cH/2;
@@ -753,7 +775,7 @@ function makePallet(cargoColor){
 
   // Draw grid lines to simulate 2x2x3 carton stack
   var cols=2, rows=2, layers=3;
-  var cW=PW*0.88, cD=PL*0.88;
+  var cW=PL*0.88, cD=PW*0.88;
   var lineMat=new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:0.22});
   var lineY=0.15; // base of cargo
 
@@ -1155,40 +1177,64 @@ function handleArrival(w){
   if(w.action==='pickup'&&currentRef){
     var d=currentRef.sd,c=currentRef.sc;
     var m=storGrid[d]&&storGrid[d][c];
-    if(m){storGrid[d][c]=null;scene.remove(m);forkGroup.add(m);
-      m.position.set(0,0,FORK_REACH*0.9);m.rotation.set(0,0,0);fk.carrying=m;}
+    if(m){storGrid[d][c]=null;fk.carrying=m;opOps++;}
   }
   if(w.action==='pickup_temp'&&currentRef){
     var tc=currentRef.tempCol, si=currentRef.tempStackIdx;
     var arr=tempGrid2[tc];
     if(arr.length>0 && si<arr.length){
       var top=arr[si];
-      if(top&&top.mesh){scene.remove(top.mesh);forkGroup.add(top.mesh);
-        top.mesh.position.set(0,0,FORK_REACH*0.9);top.mesh.rotation.set(0,0,0);
-        fk.carrying=top.mesh;}
+      if(top&&top.mesh){fk.carrying=top.mesh;opOps++;}
       arr.splice(si,1);
     }
   }
   if(w.action==='dropoff'&&fk.carrying){
-    var m2=fk.carrying,v=new THREE.Vector3();
-    m2.getWorldPosition(v);forkGroup.remove(m2);scene.add(m2);
-    m2.position.set(v.x,0,v.z);m2.rotation.set(0,0,0);fk.carrying=null;
+    var m2=fk.carrying;
+    // Snap to exact target position
     if(currentRef){
+      m2.position.set(prepX(currentRef.pd),0,prepColZ(currentRef.pc));
+      m2.rotation.set(0,0,0);
       prepGrid[currentRef.pd][currentRef.pc]=m2;
       palletMap.set(m2,{item:items[currentRef.itemIdx],zone:'Sorting',
         col:currentRef.pc+1,depth:currentRef.pd+1});
+    } else {
+      m2.position.set(m2.position.x,0,m2.position.z);m2.rotation.set(0,0,0);
     }
+    fk.carrying=null;
     itemSortedCount[currentRef.itemIdx]++;
-    loadedCount++;
+    loadedCount++; opOps++; opPallets++;
     document.getElementById('loaded').textContent=loadedCount;
   }
   if(w.action==='dropoff_temp'&&fk.carrying&&currentRef){
-    var m3=fk.carrying,v2=new THREE.Vector3();
-    m3.getWorldPosition(v2);forkGroup.remove(m3);scene.add(m3);
-    m3.position.set(v2.x,0,v2.z);m3.rotation.set(0,0,0);fk.carrying=null;
-    tempGrid2[currentRef.tempCol].push({mesh:m3, itemIdx:currentRef.itemIdx});
+    var m3=fk.carrying;
+    var tc=currentRef.tempCol;
+    var pd=currentRef.tempPd!==undefined?currentRef.tempPd:(DEPTHS-1-( tempGrid2[tc]?tempGrid2[tc].length:0));
+    m3.position.set(tempX(pd),0,tempColZ(tc));
+    m3.rotation.set(0,0,0);fk.carrying=null;opOps++;
+    tempGrid2[tc].push({mesh:m3, itemIdx:currentRef.itemIdx});
   }
 }
+// ── Operation timer display ───────────────────────────────────────────────────
+function fmtTime(sec){
+  sec=Math.round(sec);
+  var h=Math.floor(sec/3600);
+  var m=Math.floor((sec%3600)/60);
+  var s=sec%60;
+  return (h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+}
+function updateTimer(){
+  var tPick=parseFloat(document.getElementById('t-pick').value)||15;
+  var pickSec=opOps*tPick;
+  var travSec=opDist/2.222; // 8 km/h = 2.222 m/s fixed real speed
+  var totalSec=pickSec+travSec;
+  document.getElementById('tc-pallets').textContent=opPallets;
+  document.getElementById('tc-ops').textContent=opOps;
+  document.getElementById('tc-dist').textContent=(opDist).toFixed(1)+' m';
+  document.getElementById('tc-picktime').textContent=fmtTime(pickSec);
+  document.getElementById('tc-travtime').textContent=fmtTime(travSec);
+  document.getElementById('tc-total').textContent=fmtTime(totalSec);
+}
+
 // ── Main loop ─────────────────────────────────────────────────────────────────
 function loop(ts){
   requestAnimationFrame(loop);
@@ -1196,11 +1242,25 @@ function loop(ts){
   var spd=parseFloat(document.getElementById('speed').value);
 
   if(playing&&wHead){
-    var moveSpd=spd*3.0,rotSpd=spd*3.2,forkSpd=spd*1.6;
+    updateTimer();
+    var REAL_SPEED=2.222; // 8 km/h in m/s
+    var moveSpd=REAL_SPEED*spd,rotSpd=REAL_SPEED*spd*1.1,forkSpd=REAL_SPEED*spd*0.55;
     var df=wHead.forkY-fk.forkY;
     if(Math.abs(df)>0.005){
       fk.forkY+=Math.sign(df)*Math.min(Math.abs(df),forkSpd*dt);
       forkGroup.position.y=fk.forkY;
+    }
+    // Update carried pallet world position (no rotation inheritance)
+    if(fk.carrying){
+      // Mast is at z=1.10 from forklift center; forks extend FORK_REACH forward from mast
+      // Pallet center sits at: mast offset + half pallet length on forks
+      var fkOffsetZ=1.40+FORK_REACH*0.5;
+      fk.carrying.position.set(
+        fk.x+Math.sin(fk.angle)*fkOffsetZ,
+        fk.forkY+0.07,
+        fk.z+Math.cos(fk.angle)*fkOffsetZ
+      );
+      fk.carrying.rotation.y=fk.angle;
     }
     var tx=wHead.x,tz=wHead.z,ddx=tx-fk.x,ddz=tz-fk.z;
     var dist=Math.sqrt(ddx*ddx+ddz*ddz);
@@ -1222,6 +1282,7 @@ function loop(ts){
       forkliftGroup.rotation.y=fk.angle;
       if(Math.abs(da)<0.15){
         var mv=Math.min(dist,moveSpd*dt);
+        opDist+=mv; // accumulate distance in metres
         fk.x+=ddx/dist*mv;fk.z+=ddz/dist*mv;
         forkliftGroup.position.set(fk.x,0,fk.z);
       }
@@ -1287,8 +1348,9 @@ function setupInput(){
         '<b>'+info.item.name+'</b><br>'+
         'Zone: '+info.zone+'&nbsp;&nbsp;Col: '+info.col+'&nbsp;&nbsp;Depth: '+info.depth;
       tooltip.style.display='block';
-      tooltip.style.left=(e.clientX+14)+'px';
-      tooltip.style.top=(e.clientY-10)+'px';
+      var vpr=document.getElementById('viewport').getBoundingClientRect();
+      tooltip.style.left=(e.clientX-vpr.left+14)+'px';
+      tooltip.style.top=(e.clientY-vpr.top-10)+'px';
     } else {
       tooltip.style.display='none';
     }
@@ -1349,11 +1411,18 @@ function setupInput(){
 function doFullReset(keepScene){
   panX=0;panZ=0;
   orbitA.th=-0.8;orbitA.ph=1.0;orbitR=40;
+  opPallets=0;opOps=0;opDist=0;
+  ['tc-pallets','tc-ops'].forEach(function(id){document.getElementById(id).textContent='0';});
+  document.getElementById('tc-dist').textContent='0.0 m';
+  ['tc-picktime','tc-travtime','tc-total'].forEach(function(id){document.getElementById(id).textContent='00:00:00';});
+  // Re-enable Sort Complete button
+  var btn=document.getElementById('btn-fill-temp');
+  if(btn){btn.disabled=false;btn.style.opacity='1';btn.style.cursor='pointer';}
   camMode='free';
   document.querySelectorAll('.cam').forEach(function(b){b.classList.remove('on');});
   document.getElementById('c-free').classList.add('on');
   playing=false;wq=[];wHead=null;wPosArrived=false;currentRef=null;
-  if(fk.carrying){forkGroup.remove(fk.carrying);fk.carrying=null;}
+  if(fk.carrying){fk.carrying=null;}
   if(typeof tempZone!=='undefined')
     tempGrid2.forEach(function(col){
       col.forEach(function(slot){if(slot&&slot.mesh)scene.remove(slot.mesh);});
@@ -1374,8 +1443,17 @@ function fillTempInstant(){
   // Stop any running simulation
   playing=false;
   wq=[];wHead=null;wPosArrived=false;currentRef=null;
-  if(fk.carrying){forkGroup.remove(fk.carrying);fk.carrying=null;}
+  if(fk.carrying){fk.carrying=null;}
   document.getElementById('btn-play').innerHTML='&#9654; Start';
+
+  // ── Snapshot grid BEFORE clearing for timer calculation ──────────────────
+  var gridSnap=[],typeSnap=[];
+  for(var d=0;d<DEPTHS;d++){gridSnap[d]=[];typeSnap[d]=[];
+    for(var c=0;c<COLS;c++){
+      gridSnap[d][c]=storGrid[d]&&storGrid[d][c]?true:false;
+      typeSnap[d][c]=storItemType[d][c];
+    }
+  }
 
   // Move ALL pallets from receiving directly to sorting area instantly
   for(var d=0;d<DEPTHS;d++){
@@ -1417,6 +1495,101 @@ function fillTempInstant(){
   document.getElementById('loaded').textContent=loadedCount;
   document.getElementById('status').textContent='All pallets sorted!';
   document.getElementById('btn-play').innerHTML='Done';
+  // Disable Sort Complete after use until Reset
+  var fillBtn=document.getElementById('btn-fill-temp');
+  fillBtn.disabled=true;fillBtn.style.opacity='0.35';fillBtn.style.cursor='not-allowed';
+
+  // Calculate exact operation stats matching simulation logic
+  // Each makeTrip = 8 waypoints with these key distances:
+  // dist = |LANE→pickup_x| + |pickup_z→drop_z along lane| + |LANE→drop_x| (×2 for in/out)
+  function tripDist(px,pz,dx,dz){
+    // lane travel to pickup col, enter/exit receiving, lane travel to drop col, enter/exit drop
+    return Math.abs(px-LANE_X)*2 + Math.abs(pz-fk.z) + Math.abs(dz-pz) + Math.abs(dx-LANE_X)*2;
+  }
+
+  // Simulate planPick logic on the pre-cleared snapshot
+  var gridCopy=[],typeCopy=[];
+  for(var d=0;d<DEPTHS;d++){gridCopy[d]=[];typeCopy[d]=[];
+    for(var c=0;c<COLS;c++){gridCopy[d][c]=gridSnap[d][c];
+      typeCopy[d][c]=typeSnap[d][c];}}
+  var tempCopy=[];for(var tc=0;tc<COLS+50;tc++)tempCopy.push([]);
+  var sortedCount=[],sortSlot=[];
+  for(var i=0;i<items.length;i++){sortedCount[i]=0;sortSlot[i]=0;}
+  var simIdx=0,totalOps=0,totalDist=0,totalPal=0;
+  var maxIter=loadedCount*8+100; // safety limit
+  var iter=0;
+
+  function simColFront(c){
+    for(var d=0;d<DEPTHS;d++)if(gridCopy[d]&&gridCopy[d][c])return{sd:d,sc:c};return null;}
+  function simNextSort(idx){
+    var it=items[idx];var pd=sortSlot[idx]%DEPTHS;var pc=items[idx].startCol+Math.floor(sortSlot[idx]/DEPTHS);
+    sortSlot[idx]++;return{pd:pd,pc:Math.min(pc,it.startCol+it.colsNeeded-1)};}
+  function simTempDrop(itemIdx){
+    var it=items[itemIdx];var endCol=it.startCol+it.colsNeeded-1;
+    for(var c=endCol;c>=it.startCol;c--){
+      if(tempCopy[c]&&tempCopy[c].length<DEPTHS){
+        var cnt=tempCopy[c].length;return{col:c,pd:(DEPTHS-1)-cnt,pz:tempColZ(c)};}}
+    return{col:it.startCol,pd:0,pz:tempColZ(it.startCol)};}
+  function simTempPick(itemIdx){
+    var it=items[itemIdx];
+    for(var c=it.startCol;c<=it.startCol+it.colsNeeded-1;c++){
+      if(tempCopy[c]&&tempCopy[c].length>0){
+        var si=tempCopy[c].length-1;
+        return{col:c,stackIdx:si,pd:(DEPTHS-1)-si,pz:tempColZ(c)};}}
+    return null;}
+
+  var curZ=colZ(0);
+  while(simIdx<items.length&&iter<maxIter){
+    iter++;
+    while(simIdx<items.length&&(items[simIdx].qty===0||sortedCount[simIdx]>=items[simIdx].qty))simIdx++;
+    if(simIdx>=items.length)break;
+    var idx=simIdx;
+
+    // 1. Rescue from temp
+    var tpp=simTempPick(idx);
+    if(tpp){
+      var sp=simNextSort(idx);
+      var dist=tripDist(tempEnterX(tpp.pd),tpp.pz,prepX(sp.pd)-EFF_REACH,prepColZ(sp.pc));
+      totalDist+=dist;totalOps+=2;curZ=prepColZ(sp.pc);
+      tempCopy[tpp.col].splice(tpp.stackIdx,1);
+      sortedCount[idx]++;totalPal++;
+      continue;
+    }
+    // 2. Direct from receiving
+    var directFound=false;
+    for(var c=0;c<COLS;c++){
+      var ref=simColFront(c);
+      if(ref&&typeCopy[ref.sd][ref.sc]===items[idx]){
+        var sp2=simNextSort(idx);
+        var dist=tripDist(storX(ref.sd)+EFF_REACH,colZ(ref.sc),prepX(sp2.pd)-EFF_REACH,prepColZ(sp2.pc));
+        totalDist+=dist;totalOps+=2;curZ=prepColZ(sp2.pc);
+        gridCopy[ref.sd][ref.sc]=null;typeCopy[ref.sd][ref.sc]=null;
+        sortedCount[idx]++;totalPal++;directFound=true;break;
+      }
+    }
+    if(directFound)continue;
+    // 3. Move blocker to temp
+    var blockerFound=false;
+    for(var c2=0;c2<COLS;c2++){
+      var ref2=simColFront(c2);
+      if(ref2){
+        var blkIt=typeCopy[ref2.sd][ref2.sc];
+        var blkIdx=items.indexOf(blkIt);if(blkIdx<0)blkIdx=0;
+        var tdp=simTempDrop(blkIdx);
+        var dist=tripDist(storX(ref2.sd)+EFF_REACH,colZ(ref2.sc),tempEnterX(tdp.pd),tdp.pz);
+        totalDist+=dist;totalOps+=2;curZ=tdp.pz;
+        gridCopy[ref2.sd][ref2.sc]=null;typeCopy[ref2.sd][ref2.sc]=null;
+        tempCopy[tdp.col].push({itemIdx:blkIdx});
+        blockerFound=true;break;
+      }
+    }
+    if(!blockerFound)break;
+  }
+
+  opPallets=totalPal;
+  opOps=totalOps;
+  opDist=totalDist;
+  updateTimer();
 }
 
 // ── File Upload (Excel / CSV) ─────────────────────────────────────────────────
@@ -1495,7 +1668,12 @@ document.getElementById('btn-play').addEventListener('click',function(){
   if(loadedCount>=total)return;
   playing=!playing;
   document.getElementById('btn-play').innerHTML=playing?'⏸ Pause':'▶ Resume';
-  if(playing&&!wHead)planPick();
+  if(playing){
+    // Disable Sort Complete once simulation starts
+    var btn=document.getElementById('btn-fill-temp');
+    btn.disabled=true;btn.style.opacity='0.35';btn.style.cursor='not-allowed';
+    planPick();
+  }
 });
 document.getElementById('btn-reset').addEventListener('click',function(){doFullReset(false);});
 document.getElementById('btn-fill-temp').addEventListener('click',fillTempInstant);
